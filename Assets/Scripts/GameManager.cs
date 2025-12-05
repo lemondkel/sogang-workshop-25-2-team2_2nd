@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.Collections; // 코루틴(IEnumerator) 사용을 위해 추가
 
 public class GameManager : MonoBehaviour
 {
@@ -11,9 +12,9 @@ public class GameManager : MonoBehaviour
     public enum GameState
     {
         Starting, // 게임 시작 중
-        Playing,  // 플레이 중
-        Paused,   // 일시정지
-        GameOver  // 게임 오버
+        Playing, // 플레이 중
+        Paused,// 일시정지
+        GameOver // 게임 오버
     }
     public GameState CurrentGameState { get; private set; }
 
@@ -35,6 +36,20 @@ public class GameManager : MonoBehaviour
     [Tooltip("클릭 가능한 오브젝트에 시선을 맞췄을 때 사용할 강조 Sprite입니다.")]
     public Sprite highlightedSprite;
 
+    [Tooltip("퀘스트1 패널")]
+    public GameObject quest1Object;
+
+    [Tooltip("퀘스트2 패널")]
+    public GameObject quest2Object;
+
+    [Tooltip("퀘스트3 패널")]
+    public GameObject quest3Object;
+
+    [Tooltip("퀘스트4 패널")]
+    public GameObject quest4Object;
+
+    [Tooltip("퀘스트5 패널")]
+    public GameObject quest5Object;
 
     void Awake()
     {
@@ -130,16 +145,7 @@ public class GameManager : MonoBehaviour
         // 남은 개수 차감
         remainingObjectCount--;
         if (remainingObjectCount < 0) remainingObjectCount = 0; // 안전장치
-
-        // 소리 재생 후 파괴
-        if (clickedObject.TryGetComponent<ClickableObject>(out var clickable))
-        {
-            clickable.StartDestructionSequence();
-        }
-        else
-        {
-            Destroy(clickedObject);
-        }
+        Destroy(clickedObject); // 오브젝트 즉시 파괴
 
         // 모든 오브젝트를 다 찾았을 때
         if (remainingObjectCount == 0)
@@ -147,6 +153,60 @@ public class GameManager : MonoBehaviour
             Debug.Log("모든 오브젝트를 찾았습니다!");
             // 마지막 패널까지 본 뒤 게임 씬으로 이동
             SceneManager.LoadScene("OutroScene");
+        }
+    }
+
+    public void OnObjectClickedQuest(GameObject clickedObject, int questIndex)
+    {
+        if (CurrentGameState != GameState.Playing) return; // 플레이 중이 아니면 무시
+
+        Debug.Log($"[GameManager] 오브젝트 클릭됨: {clickedObject.name}");
+
+        GameObject targetQuestObject = null;
+
+        // 퀘스트 인덱스에 따라 타겟 오브젝트를 설정합니다.
+        if (questIndex == 0) targetQuestObject = quest1Object;
+        else if (questIndex == 1) targetQuestObject = quest2Object;
+        else if (questIndex == 2) targetQuestObject = quest3Object;
+        else if (questIndex == 3) targetQuestObject = quest4Object;
+        else if (questIndex == 4) targetQuestObject = quest5Object;
+
+        if (targetQuestObject != null)
+        {
+            Debug.Log($"퀘스트 {questIndex + 1} 패널 활성화.");
+
+            // 퀘스트 패널 활성화 (애니메이터 스크립트의 OnEnable에서 등장 애니메이션 시작을 가정)
+            targetQuestObject.SetActive(true);
+
+            // 2초 지연 및 비활성화 코루틴 시작
+            StartCoroutine(DeactivateQuestPanelAfterDelay(targetQuestObject, 2.0f));
+        }
+    }
+
+    /// <summary>
+    /// 지정된 딜레이 후 퀘스트 패널을 부드럽게 비활성화하는 코루틴입니다.
+    /// </summary>
+    /// <param name="questPanel">활성/비활성화할 퀘스트 패널</param>
+    /// <param name="delay">패널이 표시될 시간 (초)</param>
+    IEnumerator DeactivateQuestPanelAfterDelay(GameObject questPanel, float delay)
+    {
+        // 1. 지정된 시간(2초) 동안 대기
+        yield return new WaitForSeconds(delay);
+
+        // 2. 부드러운 비활성화 애니메이션 시작 (QuestPanelAnimator 스크립트 호출)
+        // 🚨 이 부분이 '스르르 deactive'를 담당합니다.
+        if (questPanel.TryGetComponent<QuestPanelAnimator>(out var animator))
+        {
+            // 애니메이션이 끝날 때까지 기다립니다.
+            Debug.Log($"{questPanel.name} 비활성화 애니메이션 시작.");
+            yield return animator.StartCloseAnimation();
+        }
+
+        // 3. 최종적으로 GameObject 비활성화 (SetActive(false))
+        if (questPanel != null)
+        {
+            questPanel.SetActive(false);
+            Debug.Log($"{questPanel.name} 비활성화 완료.");
         }
     }
 

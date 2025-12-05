@@ -1,65 +1,108 @@
-using UnityEngine;
-using System.Collections; // CoroutineÀ» »ç¿ëÇÏ±â À§ÇØ ÇÊ¿äÇÕ´Ï´Ù.
+ï»¿using UnityEngine;
+using UnityEngine.EventSystems; // ë§ˆìš°ìŠ¤ ì˜¤ë²„ ê°ì§€ë¥¼ ìœ„í•´ ì¶”ê°€
 
 /// <summary>
-/// Å¬¸¯ °¡´ÉÇÑ ¿ÀºêÁ§Æ®¿¡ ºÎÂøµÇ¾î, ¼Ò¸®¸¦ Àç»ıÇÑ ÈÄ Áö¿¬ ÆÄ±«¸¦ Ã³¸®ÇÕ´Ï´Ù.
-/// GameManager¿¡¼­ ÀÌ ¿ÀºêÁ§Æ®¸¦ Á÷Á¢ ÆÄ±«ÇÏ´Â ´ë½Å ÀÌ ½ÃÄö½º¸¦ È£ÃâÇÕ´Ï´Ù.
+/// í´ë¦­ ê°€ëŠ¥í•œ ì˜¤ë¸Œì íŠ¸ì— ë¶€ì°©ë˜ì–´, ë§ˆìš°ìŠ¤ ì¸í„°ë™ì…˜ê³¼ í´ë¦­ ì‹œ ì¦‰ì‹œ íŒŒê´´ë¥¼ ì²˜ë¦¬í•©ë‹ˆë‹¤.
 /// </summary>
-[RequireComponent(typeof(AudioSource))]
-public class ClickableObject : MonoBehaviour
+public class ClickableObject : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
-    // Inspector¿¡¼­ ÇÒ´çÇÒ ¾ß¿Ë ¼Ò¸® ¿Àµğ¿À Å¬¸³
-    [Tooltip("¿ÀºêÁ§Æ® Å¬¸¯ ½Ã Àç»ıÇÒ ¼Ò¸® Å¬¸³ÀÔ´Ï´Ù.")]
-    public AudioClip MeowSound;
-
-    private AudioSource audioSource;
     private Collider objectCollider;
+    private bool isClicked = false;
+
+    // ì´ ì˜¤ë¸Œì íŠ¸ì˜ ë ˆì´ì–´ë¥¼ ë¯¸ë¦¬ ê°€ì ¸ì™€ ë¡œì§ì— ì‚¬ìš©í•©ë‹ˆë‹¤.
+    private string myLayerName;
 
     void Awake()
     {
-        audioSource = GetComponent<AudioSource>();
+        // AudioSource ê´€ë ¨ ì½”ë“œëŠ” ëª¨ë‘ ì œê±°ë˜ì—ˆìŠµë‹ˆë‹¤.
         objectCollider = GetComponent<Collider>();
+        myLayerName = LayerMask.LayerToName(gameObject.layer);
     }
 
+    // ------------------------------------
+    // ë§ˆìš°ìŠ¤ ì˜¤ë²„ / ì´íƒˆ ì²˜ë¦¬ (í¬ë¡œìŠ¤í—¤ì–´ ë³€ê²½)
+    // ------------------------------------
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (!isClicked && GameManager.Instance != null && GameManager.Instance.CurrentGameState == GameManager.GameState.Playing)
+        {
+            // GameManagerì—ê²Œ ê°•ì¡°ëœ í¬ë¡œìŠ¤í—¤ì–´ë¥¼ í‘œì‹œí•˜ë„ë¡ ìš”ì²­í•©ë‹ˆë‹¤.
+            GameManager.Instance.SetCrosshairVisuals(true);
+
+            // íŠ¹ì • ë ˆì´ì–´ì— ë”°ë¥¸ ì¶”ê°€ ì•¡ì…˜ (ì˜ˆì‹œ)
+            if (myLayerName == "Quest1")
+            {
+                Debug.Log("Quest1 ë ˆì´ì–´ ê°ì§€ë¨: íŠ¹ìˆ˜ ì‹œê° íš¨ê³¼ ì¤€ë¹„.");
+            }
+        }
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        // í´ë¦­ë˜ì§€ ì•Šì€ ìƒíƒœì¼ ë•Œë§Œ ê¸°ë³¸ í¬ë¡œìŠ¤í—¤ì–´ë¡œ ë˜ëŒë¦½ë‹ˆë‹¤.
+        if (!isClicked && GameManager.Instance != null)
+        {
+            GameManager.Instance.SetCrosshairVisuals(false);
+        }
+    }
+
+    // ------------------------------------
+    // í´ë¦­ ê°ì§€ ë° ë¡œì§
+    // ------------------------------------
+
+    private void OnMouseDown()
+    {
+        // ğŸš¨ ìˆœí™˜ í˜¸ì¶œ ë° ì¤‘ë³µ í´ë¦­ ë°©ì§€ (ê°€ì¥ ì¤‘ìš”)
+        if (isClicked || GameManager.Instance == null || GameManager.Instance.CurrentGameState != GameManager.GameState.Playing)
+        {
+            return;
+        }
+
+        // í´ë¦­ í”Œë˜ê·¸ ì„¤ì • ë° í¬ë¡œìŠ¤í—¤ì–´ ë¦¬ì…‹
+        isClicked = true;
+        GameManager.Instance.SetCrosshairVisuals(false);
+
+        // íŠ¹ì • ë ˆì´ì–´ì— ë”°ë¥¸ í´ë¦­ ì•¡ì…˜ (ì˜ˆì‹œ)
+        if (myLayerName == "Quest1")
+        {
+            GameManager.Instance.OnObjectClickedQuest(gameObject, 0);
+        }
+        else if (myLayerName == "Quest2")
+        {
+            GameManager.Instance.OnObjectClickedQuest(gameObject, 1);
+        }
+         else if (myLayerName == "Quest3")
+        {
+            GameManager.Instance.OnObjectClickedQuest(gameObject, 2);
+        }
+         else if (myLayerName == "Quest4")
+        {
+            GameManager.Instance.OnObjectClickedQuest(gameObject, 3);
+        }
+         else if (myLayerName == "Quest5")
+        {
+            GameManager.Instance.OnObjectClickedQuest(gameObject, 4);
+        }
+        else
+        {
+            GameManager.Instance.OnObjectClicked(gameObject);
+        }
+
+    }
     /// <summary>
-    /// GameManager¿¡¼­ È£ÃâµÇ¾î ¼Ò¸® Àç»ı ¹× ÆÄ±« ½ÃÄö½º¸¦ ½ÃÀÛÇÕ´Ï´Ù.
+    /// GameManagerì—ì„œ í˜¸ì¶œë˜ì–´ ì˜¤ë¸Œì íŠ¸ íŒŒê´´ ì‹œí€€ìŠ¤ë¥¼ ì‹œì‘í•©ë‹ˆë‹¤.
+    /// ì†Œë¦¬ ì¬ìƒ ì—†ì´ ì¦‰ì‹œ íŒŒê´´ë¥¼ ìˆ˜í–‰í•©ë‹ˆë‹¤.
     /// </summary>
     public void StartDestructionSequence()
     {
-        // 1. ¼Ò¸®°¡ Àç»ıµÇ´Â µ¿¾È Ãß°¡ Å¬¸¯ ¹æÁö
+        // 1. ì¶”ê°€ í´ë¦­ ë°©ì§€ë¥¼ ìœ„í•´ ì½œë¼ì´ë” ë¹„í™œì„±í™”
         if (objectCollider != null)
         {
             objectCollider.enabled = false;
         }
 
-        // 2. ½Ã°¢Àû º¯È­ (¼±ÅÃ »çÇ×: Å¬¸¯µÇ¸é »ç¶óÁö°Å³ª Æ¢¾î³ª¿À´Â µîÀÇ È¿°ú)
-        // ¿¹: GetComponent<MeshRenderer>().enabled = false;
-
-        // 3. ¼Ò¸® Àç»ı
-        if (MeowSound != null)
-        {
-            audioSource.PlayOneShot(MeowSound);
-
-            // 4. ¼Ò¸® Àç»ıÀÌ ³¡³¯ ¶§±îÁö ±â´Ù¸° ÈÄ ÆÄ±« ÄÚ·çÆ¾ ½ÃÀÛ
-            StartCoroutine(DestroyAfterSound(MeowSound.length));
-        }
-        else
-        {
-            // ¼Ò¸®°¡ ¾ø´Ù¸é Áï½Ã ÆÄ±«
-            Destroy(gameObject);
-        }
-    }
-
-    /// <summary>
-    /// ÁöÁ¤µÈ ½Ã°£¸¸Å­ ±â´Ù¸° ÈÄ ¿ÀºêÁ§Æ®¸¦ ÆÄ±«ÇÏ´Â ÄÚ·çÆ¾ÀÔ´Ï´Ù.
-    /// </summary>
-    /// <param name="delay">ÆÄ±«ÇÒ ¶§±îÁö ±â´Ù¸± ½Ã°£ (ÃÊ)</param>
-    IEnumerator DestroyAfterSound(float delay)
-    {
-        // ¼Ò¸®°¡ ³¡³¯ ¶§±îÁö ±â´Ù¸³´Ï´Ù.
-        yield return new WaitForSeconds(delay);
-
-        // ÆÄ±«
+        // 2. ì˜¤ë¸Œì íŠ¸ ì¦‰ì‹œ íŒŒê´´ (ì§€ì—° ì—†ìŒ)
         Destroy(gameObject);
     }
 }
