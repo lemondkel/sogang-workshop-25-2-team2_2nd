@@ -30,20 +30,26 @@ public class MenuUI : MonoBehaviour
         screenRoot = UIKit.Stretch(UIKit.Rect(canvas.transform, "Screens"));
     }
 
-    // 타이틀 화면에서만 보이는 하단 메뉴
+    // 타이틀 화면에서만 보이는 메뉴.
+    // 씬의 시작/나가기 버튼이 화면 가운데 아래(y -300, -450)에 있으므로 겹치지 않게 오른쪽 아래 구석에 세로로 둡니다.
     void BuildTitleBar()
     {
-        titleBar = UIKit.Fixed(UIKit.Rect(canvas.transform, "TitleMenu"), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(1000, 90));
-        HorizontalLayoutGroup h = titleBar.gameObject.AddComponent<HorizontalLayoutGroup>();
-        h.spacing = 24;
-        h.childControlWidth = true;
-        h.childControlHeight = true;
-        h.childForceExpandWidth = true;
-        h.childForceExpandHeight = true;
+        titleBar = UIKit.Fixed(UIKit.Rect(canvas.transform, "TitleMenu"), new Vector2(1, 0), new Vector2(-40, 40), new Vector2(320, 276));
+        VerticalLayoutGroup v = titleBar.gameObject.AddComponent<VerticalLayoutGroup>();
+        v.spacing = 18;
+        v.childControlWidth = true;
+        v.childControlHeight = true;
+        v.childForceExpandWidth = true;
+        v.childForceExpandHeight = true;
 
-        UIKit.Button(titleBar, "고양이 앨범", ShowAlbum, UIKit.BrownLight, 36);
-        UIKit.Button(titleBar, "게임 방법", ShowHowToPlay, UIKit.BrownLight, 36);
-        UIKit.Button(titleBar, "설정", () => SettingsPanel.Build(screenRoot, null, null), UIKit.BrownLight, 36);
+        // 기존 시작/끝내기 버튼처럼 흰 바탕에 갈색 글씨
+        Button[] buttons =
+        {
+            UIKit.Button(titleBar, "고양이 앨범", ShowAlbum, Color.white, 34),
+            UIKit.Button(titleBar, "게임 방법", ShowHowToPlay, Color.white, 34),
+            UIKit.Button(titleBar, "설정", () => SettingsPanel.Build(screenRoot, null, null), Color.white, 34),
+        };
+        foreach (Button b in buttons) UIKit.ButtonLabel(b).color = UIKit.Brown;
     }
 
     public void SetTitleMenuVisible(bool visible)
