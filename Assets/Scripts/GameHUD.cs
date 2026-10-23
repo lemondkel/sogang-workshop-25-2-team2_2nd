@@ -14,6 +14,7 @@ public class GameHUD : MonoBehaviour
     private GameManager gm;
     private Canvas canvas;
     private RectTransform overlayRoot;
+    private RectTransform hudRoot; // 플레이 중 보이는 HUD (오버레이 화면이 뜨면 숨깁니다)
 
     private Text timerText;
     private Text catsText;
@@ -33,6 +34,7 @@ public class GameHUD : MonoBehaviour
         canvas = UIKit.CreateCanvas("GameHUD", 50);
         canvas.transform.SetParent(transform, false);
 
+        hudRoot = UIKit.Stretch(UIKit.Rect(canvas.transform, "HUD"));
         BuildTopBar();
         BuildToast();
         BuildHintArrow();
@@ -47,7 +49,7 @@ public class GameHUD : MonoBehaviour
         CatLevel level = gm.Level;
 
         // 왼쪽 위: 찾을 고양이 사진 + 레벨 이름
-        Image left = UIKit.Card(canvas.transform, "LevelInfo");
+        Image left = UIKit.Card(hudRoot, "LevelInfo");
         UIKit.Fixed(left.rectTransform, new Vector2(0, 1), new Vector2(30, -30), new Vector2(520, 150));
         RawImage photo = UIKit.Photo(left.transform, level.photo);
         UIKit.Fixed((RectTransform)photo.transform.parent, new Vector2(0, 0.5f), new Vector2(15, 0), new Vector2(120, 120));
@@ -55,13 +57,13 @@ public class GameHUD : MonoBehaviour
         UIKit.Place(levelName.rectTransform, Vector2.zero, Vector2.one, new Vector2(150, 10), new Vector2(-15, -10));
 
         // 가운데 위: 타이머
-        Image timerBox = UIKit.Card(canvas.transform, "Timer");
+        Image timerBox = UIKit.Card(hudRoot, "Timer");
         UIKit.Fixed(timerBox.rectTransform, new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(260, 100));
         timerText = UIKit.Label(timerBox.transform, "00:00", 56, UIKit.Brown);
         UIKit.Stretch(timerText.rectTransform);
 
         // 오른쪽 위: 고양이/단서 카운트
-        Image right = UIKit.Card(canvas.transform, "Counters");
+        Image right = UIKit.Card(hudRoot, "Counters");
         UIKit.Fixed(right.rectTransform, new Vector2(1, 1), new Vector2(-30, -30), new Vector2(380, 150));
         catsText = UIKit.Label(right.transform, "", 40, UIKit.Brown, TextAnchor.MiddleLeft);
         UIKit.Place(catsText.rectTransform, new Vector2(0, 0.5f), new Vector2(1, 1), new Vector2(25, 0), new Vector2(-15, -8));
@@ -69,7 +71,7 @@ public class GameHUD : MonoBehaviour
         UIKit.Place(cluesText.rectTransform, new Vector2(0, 0), new Vector2(1, 0.5f), new Vector2(25, 8), new Vector2(-15, 0));
 
         // 아래: 조작 안내 + 힌트
-        Image bottom = UIKit.Panel(canvas.transform, "Controls", new Color(0, 0, 0, 0.35f));
+        Image bottom = UIKit.Panel(hudRoot, "Controls", new Color(0, 0, 0, 0.35f));
         UIKit.Fixed(bottom.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(1100, 60));
         hintText = UIKit.Label(bottom.transform, "", 28, Color.white);
         UIKit.Stretch(hintText.rectTransform);
@@ -77,7 +79,7 @@ public class GameHUD : MonoBehaviour
 
     void BuildToast()
     {
-        Image toast = UIKit.Card(canvas.transform, "Toast");
+        Image toast = UIKit.Card(hudRoot, "Toast");
         UIKit.Fixed(toast.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0, 220), new Vector2(900, 110));
         toastText = UIKit.Label(toast.transform, "", 44, UIKit.Brown);
         UIKit.Stretch(toastText.rectTransform);
@@ -88,7 +90,7 @@ public class GameHUD : MonoBehaviour
 
     void BuildHintArrow()
     {
-        RectTransform root = UIKit.Fixed(UIKit.Rect(canvas.transform, "HintArrow"), new Vector2(0.5f, 0.5f), new Vector2(0, -40), new Vector2(240, 240));
+        RectTransform root = UIKit.Fixed(UIKit.Rect(hudRoot, "HintArrow"), new Vector2(0.5f, 0.5f), new Vector2(0, -40), new Vector2(240, 240));
         hintArrow = UIKit.Fixed(UIKit.Rect(root, "Arrow"), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240, 240));
         Text arrow = UIKit.Label(hintArrow, "▲", 110, UIKit.Orange);
         UIKit.Place(arrow.rectTransform, new Vector2(0, 0.55f), new Vector2(1, 1), Vector2.zero, Vector2.zero);
@@ -172,6 +174,7 @@ public class GameHUD : MonoBehaviour
 
     public void HideOverlays()
     {
+        hudRoot.gameObject.SetActive(true);
         for (int i = overlayRoot.childCount - 1; i >= 0; i--)
         {
             Destroy(overlayRoot.GetChild(i).gameObject);
@@ -181,6 +184,7 @@ public class GameHUD : MonoBehaviour
     Image NewScreen(string name, Vector2 cardSize, out Image card)
     {
         HideOverlays();
+        hudRoot.gameObject.SetActive(false); // 위쪽 HUD 상자와 카드가 겹치지 않도록
         Image dim = UIKit.Panel(overlayRoot, name, UIKit.Dim);
         UIKit.Stretch(dim.rectTransform);
         card = UIKit.Card(dim.transform, "Card");
@@ -219,7 +223,7 @@ public class GameHUD : MonoBehaviour
         body.lineSpacing = 1.15f;
         body.verticalOverflow = VerticalWrapMode.Truncate;
         body.resizeTextForBestFit = true;
-        body.resizeTextMinSize = 20;
+        body.resizeTextMinSize = 24;
         body.resizeTextMaxSize = 36;
 
         Button back = UIKit.Button(card.transform, "레벨 선택", () => gm.GoToLevelSelect(), UIKit.Gray, 38);
@@ -235,7 +239,7 @@ public class GameHUD : MonoBehaviour
     public void ShowPause()
     {
         Image card;
-        NewScreen("Pause", new Vector2(700, 760), out card);
+        NewScreen("Pause", new Vector2(700, 680), out card);
 
         Text title = UIKit.Label(card.transform, "일시정지", 64, UIKit.Brown);
         UIKit.Place(title.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -140), new Vector2(0, -30));
