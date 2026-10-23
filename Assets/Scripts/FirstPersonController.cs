@@ -34,11 +34,14 @@ public class FirstPersonController : MonoBehaviour
     [Tooltip("조준점(화면 중앙)이 캐릭터를 가리지 않도록 캐릭터를 화면 왼쪽으로 비켜 세우는 거리")]
     public float aimSideOffset = 0.42f;
     public float shoulderOffset = 0.35f;
-    public float cameraRadius = 0.22f;
+    public float cameraRadius = 0.16f;
     public float fieldOfView = 55f;
     public float firstPersonFieldOfView = 65f;
     [Tooltip("벽에 밀려 카메라가 이 거리보다 가까워지면 몸을 숨깁니다 (몸이 화면을 가리지 않게)")]
-    public float hideBodyDistance = 1.0f;
+    public float hideBodyDistance = 0.75f;
+    [Tooltip("다시 이 거리보다 멀어지면 몸을 보입니다 (깜빡임 방지용 여유)")]
+    public float showBodyDistance = 0.95f;
+    private bool bodyHidden;
 
     [Header("Interaction")]
     [Tooltip("카메라에서 찾을 수 있는 최대 거리")]
@@ -93,6 +96,11 @@ public class FirstPersonController : MonoBehaviour
         characterController.stepOffset = 0.35f;
 
         animator = GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            // 몸을 숨기거나 카메라가 몸 안에 있어도 애니메이션(과 LateUpdate의 팔 IK)이 계속 돌도록
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        }
         FindBones();
         bodyRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
         LevelDatabase db = LevelDatabase.Load();
@@ -189,6 +197,7 @@ public class FirstPersonController : MonoBehaviour
     {
         viewMode = viewMode == ViewMode.ThirdPerson ? ViewMode.FirstPerson : ViewMode.ThirdPerson;
         if (viewMode == ViewMode.ThirdPerson) RestoreHead();
+        bodyHidden = false;
         SetBodyVisible(true);
         targetPitch = Mathf.Clamp(targetPitch, PitchMin, PitchMax);
         if (GameManager.Instance != null && GameManager.Instance.Hud != null)
@@ -310,18 +319,29 @@ public class FirstPersonController : MonoBehaviour
     void PlaceThirdPersonCamera()
     {
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
+        int mask = EnvironmentMask;
+        RaycastHit hit;
+
         // 회전 중심을 캐릭터 오른쪽으로 비켜 두면 캐릭터는 화면 왼쪽에, 조준점은 캐릭터 옆 빈 공간에 놓입니다.
-        Vector3 pivot = transform.position + Vector3.up * cameraHeight + Quaternion.Euler(0, yaw, 0) * Vector3.right * aimSideOffset;
+        // 오른쪽이 벽이면 그만큼만 비킵니다 (회전 중심이 벽 속으로 들어가면 카메라도 벽 속에 생깁니다).
+        Vector3 center = transform.position + Vector3.up * cameraHeight;
+        Vector3 side = Quaternion.Euler(0, yaw, 0) * Vector3.right;
+        float sideLength = aimSideOffset;
+        if (Physics.SphereCast(center, cameraRadius, side, out hit, aimSideOffset, mask, QueryTriggerInteraction.Ignore))
+        {
+            sideLength = Mathf.Max(0f, hit.distance - 0.05f);
+        }
+        Vector3 pivot = center + side * sideLength;
+
         Vector3 desired = pivot + rotation * new Vector3(shoulderOffset, 0, -cameraDistance);
         Vector3 dir = desired - pivot;
         float wanted = dir.magnitude;
         dir /= wanted;
 
         // 벽이나 가구에 카메라가 파묻히지 않게 당깁니다.
-        RaycastHit hit;
-        if (Physics.SphereCast(pivot, cameraRadius, dir, out hit, wanted, EnvironmentMask, QueryTriggerInteraction.Ignore))
+        if (Physics.SphereCast(pivot, cameraRadius, dir, out hit, wanted, mask, QueryTriggerInteraction.Ignore))
         {
-            wanted = Mathf.Max(hit.distance, 0.35f);
+            wanted = Mathf.Max(hit.distance, 0.25f);
         }
         // 가까워질 때는 바로, 멀어질 때는 천천히
         currentCameraDistance = wanted < currentCameraDistance
@@ -331,8 +351,10 @@ public class FirstPersonController : MonoBehaviour
         cam.position = pivot + dir * currentCameraDistance;
         cam.rotation = rotation;
 
-        // 좁은 방에서 카메라가 몸에 붙으면 몸이 화면을 다 가리므로 잠시 숨깁니다.
-        SetBodyVisible(currentCameraDistance >= hideBodyDistance);
+        // 좁은 방에서 카메라가 몸에 붙으면 몸이 화면을 다 가리므로 잠시 숨깁니다. (깜빡임 방지를 위해 숨김/표시 거리를 다르게)
+        if (!bodyHidden && currentCameraDistance < hideBodyDistance) bodyHidden = true;
+        else if (bodyHidden && currentCameraDistance > showBodyDistance) bodyHidden = false;
+        SetBodyVisible(!bodyHidden);
     }
 
     void PlaceFirstPersonCamera()
