@@ -77,6 +77,7 @@ public class GameManager : MonoBehaviour
     private GameHUD hud;
     public GameHUD Hud { get { return hud; } }
     private bool usingPawCursor;
+    private static readonly Color PawIdleColor = new Color(1f, 1f, 1f, 0.85f);
     private FirstPersonController player;
     private bool pointerWasLocked;
 
@@ -475,8 +476,13 @@ public class GameManager : MonoBehaviour
         highlightedSprite = paw;
         image.sprite = paw;
         image.preserveAspect = true;
-        image.rectTransform.sizeDelta = new Vector2(46, 46);
-        image.color = new Color(1f, 1f, 1f, 0.55f);
+        image.rectTransform.sizeDelta = new Vector2(52, 52);
+        image.color = PawIdleColor;
+        // 베이지 벽/가구 위에서도 보이도록 흰 테두리
+        Outline outline = targetVisualObject.GetComponent<Outline>();
+        if (outline == null) outline = targetVisualObject.AddComponent<Outline>();
+        outline.effectColor = new Color(1f, 1f, 1f, 0.9f);
+        outline.effectDistance = new Vector2(2f, -2f);
         usingPawCursor = true;
     }
 
@@ -490,7 +496,7 @@ public class GameManager : MonoBehaviour
         if (usingPawCursor)
         {
             Image paw = targetVisualObject.GetComponent<Image>();
-            Color wanted = isTargetingClickable ? UIKit.Orange : new Color(1f, 1f, 1f, 0.55f);
+            Color wanted = isTargetingClickable ? UIKit.Orange : PawIdleColor;
             float scale = isTargetingClickable ? 1.35f : 1f;
             float k = 1f - Mathf.Exp(-14f * Time.unscaledDeltaTime);
             paw.color = Color.Lerp(paw.color, wanted, k);

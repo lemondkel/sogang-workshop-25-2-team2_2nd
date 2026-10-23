@@ -64,8 +64,9 @@ public class FirstPersonController : MonoBehaviour
     private readonly RaycastHit[] hits = new RaycastHit[16];
 
     // 1인칭 손 위치 (카메라 기준). 오른손은 간식을 든 것처럼 조금 더 앞에.
-    private static readonly Vector3 RightHandOffset = new Vector3(0.21f, -0.13f, 0.46f);
-    private static readonly Vector3 LeftHandOffset = new Vector3(-0.23f, -0.16f, 0.42f);
+    // 팔이 쭉 펴진 '좀비 자세'가 되지 않도록 조금 가깝고 낮게 (화면 아래쪽 1/3에 보입니다)
+    private static readonly Vector3 RightHandOffset = new Vector3(0.20f, -0.17f, 0.40f);
+    private static readonly Vector3 LeftHandOffset = new Vector3(-0.22f, -0.19f, 0.38f);
     private SkinnedMeshRenderer[] bodyRenderers;
     private Camera camera3d;
 
