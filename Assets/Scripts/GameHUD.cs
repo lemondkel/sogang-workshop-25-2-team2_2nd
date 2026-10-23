@@ -223,7 +223,7 @@ public class GameHUD : MonoBehaviour
         body.lineSpacing = 1.15f;
         body.verticalOverflow = VerticalWrapMode.Truncate;
         body.resizeTextForBestFit = true;
-        body.resizeTextMinSize = 24;
+        body.resizeTextMinSize = 26;
         body.resizeTextMaxSize = 36;
 
         Button back = UIKit.Button(card.transform, "레벨 선택", () => gm.GoToLevelSelect(), UIKit.Gray, 38);

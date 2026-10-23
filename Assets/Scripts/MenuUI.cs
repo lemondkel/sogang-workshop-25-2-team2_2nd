@@ -174,7 +174,7 @@ public class MenuUI : MonoBehaviour
 
         Text title = UIKit.Label(card.transform, unlocked ? level.title : "???", 36, UIKit.Brown);
         UIKit.Place(title.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(15, 175), new Vector2(-15, 235));
-        FitText(title, 24, 36);
+        FitText(title, 26, 36);
 
         string info;
         if (unlocked)
@@ -189,11 +189,11 @@ public class MenuUI : MonoBehaviour
         }
         Text infoText = UIKit.Label(card.transform, info, 26, UIKit.BrownLight, TextAnchor.UpperCenter, false);
         UIKit.Place(infoText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(15, 100), new Vector2(-15, 175));
-        FitText(infoText, 18, 26);
+        FitText(infoText, 20, 26);
 
         float best = GameSession.GetBestTime(index);
         string record = UIKit.Stars(GameSession.GetStars(index)) + (best >= 0 ? $"\n<size=24>최고 {GameSession.FormatTime(best)}</size>" : "");
-        Text recordText = UIKit.Label(card.transform, record, 46, UIKit.Star);
+        Text recordText = UIKit.Label(card.transform, record, 46, UIKit.Star, TextAnchor.UpperCenter);
         UIKit.Place(recordText.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 5), new Vector2(0, 105));
     }
 
@@ -217,9 +217,9 @@ public class MenuUI : MonoBehaviour
         // 화면 높이가 낮아도(울트라와이드) 다 들어가도록 세로는 비율(앵커)로 나눕니다.
         // 위: 레벨을 깨면 공개되는 고양이 사진
         Text catsHeader = UIKit.Label(bg.transform, "찾은 고양이", 40, UIKit.Orange, TextAnchor.MiddleLeft);
-        UIKit.Place(catsHeader.rectTransform, new Vector2(0, 0.79f), new Vector2(1, 0.85f), new Vector2(100, 0), new Vector2(-100, 0));
+        UIKit.Place(catsHeader.rectTransform, new Vector2(0, 0.79f), new Vector2(1, 0.85f), new Vector2(100, 8), new Vector2(-100, 0));
 
-        RectTransform catRow = UIKit.Place(UIKit.Rect(bg.transform, "Cats"), new Vector2(0, 0.5f), new Vector2(1, 0.79f), new Vector2(100, 0), new Vector2(-100, 0));
+        RectTransform catRow = UIKit.Place(UIKit.Rect(bg.transform, "Cats"), new Vector2(0, 0.5f), new Vector2(1, 0.79f), new Vector2(100, 0), new Vector2(-100, -4));
         HorizontalLayoutGroup h = catRow.gameObject.AddComponent<HorizontalLayoutGroup>();
         h.spacing = 30;
         h.childAlignment = TextAnchor.MiddleCenter;
@@ -252,16 +252,16 @@ public class MenuUI : MonoBehaviour
             foreach (CatTarget t in level.targets) names += (names.Length > 0 ? ", " : "") + t.catName;
             Text caption = UIKit.Label(card.transform, cleared ? names : $"LEVEL {i + 1}", 30, UIKit.Brown);
             UIKit.Place(caption.rectTransform, new Vector2(0, 0), new Vector2(1, 0), new Vector2(10, 5), new Vector2(-10, 60));
-            FitText(caption, 18, 30);
+            FitText(caption, 22, 30);
         }
 
         // 아래: 집 안에서 찾은 단서 (2칸 x 3줄, 화면 크기에 맞춰 늘어나고 줄어듭니다)
         int found = 0;
         for (int i = 0; i < db.clues.Count; i++) if (GameSession.IsClueFound(i)) found++;
         Text cluesHeader = UIKit.Label(bg.transform, $"집 안의 단서  {found} / {db.clues.Count}", 40, UIKit.Orange, TextAnchor.MiddleLeft);
-        UIKit.Place(cluesHeader.rectTransform, new Vector2(0, 0.42f), new Vector2(1, 0.48f), new Vector2(100, 0), new Vector2(-100, 0));
+        UIKit.Place(cluesHeader.rectTransform, new Vector2(0, 0.42f), new Vector2(1, 0.48f), new Vector2(100, 8), new Vector2(-100, 0));
 
-        RectTransform clueGrid = UIKit.Place(UIKit.Rect(bg.transform, "Clues"), new Vector2(0, 0.04f), new Vector2(1, 0.42f), new Vector2(100, 0), new Vector2(-100, 0));
+        RectTransform clueGrid = UIKit.Place(UIKit.Rect(bg.transform, "Clues"), new Vector2(0, 0.04f), new Vector2(1, 0.42f), new Vector2(100, 0), new Vector2(-100, -4));
         VerticalLayoutGroup rows = UIKit.VerticalLayout(clueGrid.gameObject, 16, 0);
         rows.childForceExpandHeight = true;
 
@@ -284,7 +284,7 @@ public class MenuUI : MonoBehaviour
             string text = isFound ? db.clues[i].text : "아직 찾지 못한 단서예요. 집 안을 잘 살펴보세요!";
             Text label = UIKit.Label(clue.transform, $"{i + 1}.  {text}", 30, isFound ? UIKit.Brown : UIKit.Gray, TextAnchor.MiddleLeft, isFound);
             UIKit.Place(label.rectTransform, Vector2.zero, Vector2.one, new Vector2(30, 5), new Vector2(-30, -5));
-            FitText(label, 18, 30);
+            FitText(label, 22, 30);
 
             // 홀수 개일 때 마지막 줄의 빈칸
             if (i == db.clues.Count - 1 && i % 2 == 0) UIKit.Rect(row, "Spacer");
@@ -332,7 +332,7 @@ public class MenuUI : MonoBehaviour
         // 화면 비율이 달라도 카드 밖으로 넘치지 않게 글자 크기를 자동으로 줄입니다.
         body.verticalOverflow = VerticalWrapMode.Truncate;
         body.resizeTextForBestFit = true;
-        body.resizeTextMinSize = 24;
+        body.resizeTextMinSize = 26;
         body.resizeTextMaxSize = 36;
     }
 }
