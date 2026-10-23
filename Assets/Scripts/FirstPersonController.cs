@@ -29,11 +29,16 @@ public class FirstPersonController : MonoBehaviour
 
     [Header("Camera")]
     public ViewMode viewMode = ViewMode.ThirdPerson;
-    public float cameraDistance = 2.3f;
-    public float cameraHeight = 1.45f;
-    public float shoulderOffset = 0.45f;
+    public float cameraDistance = 2.0f;
+    public float cameraHeight = 1.5f;
+    [Tooltip("조준점(화면 중앙)이 캐릭터를 가리지 않도록 캐릭터를 화면 왼쪽으로 비켜 세우는 거리")]
+    public float aimSideOffset = 0.42f;
+    public float shoulderOffset = 0.35f;
     public float cameraRadius = 0.22f;
     public float fieldOfView = 55f;
+    public float firstPersonFieldOfView = 65f;
+    [Tooltip("벽에 밀려 카메라가 이 거리보다 가까워지면 몸을 숨깁니다 (몸이 화면을 가리지 않게)")]
+    public float hideBodyDistance = 1.0f;
 
     [Header("Interaction")]
     [Tooltip("카메라에서 찾을 수 있는 최대 거리")]
@@ -56,8 +61,10 @@ public class FirstPersonController : MonoBehaviour
     private readonly RaycastHit[] hits = new RaycastHit[16];
 
     // 1인칭 손 위치 (카메라 기준). 오른손은 간식을 든 것처럼 조금 더 앞에.
-    private static readonly Vector3 RightHandOffset = new Vector3(0.21f, -0.24f, 0.46f);
-    private static readonly Vector3 LeftHandOffset = new Vector3(-0.23f, -0.28f, 0.42f);
+    private static readonly Vector3 RightHandOffset = new Vector3(0.21f, -0.13f, 0.46f);
+    private static readonly Vector3 LeftHandOffset = new Vector3(-0.23f, -0.16f, 0.42f);
+    private SkinnedMeshRenderer[] bodyRenderers;
+    private Camera camera3d;
 
     int EnvironmentMask
     {
@@ -87,18 +94,31 @@ public class FirstPersonController : MonoBehaviour
 
         animator = GetComponentInChildren<Animator>();
         FindBones();
-        foreach (SkinnedMeshRenderer smr in GetComponentsInChildren<SkinnedMeshRenderer>())
+        bodyRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
+        LevelDatabase db = LevelDatabase.Load();
+        foreach (SkinnedMeshRenderer smr in bodyRenderers)
         {
             smr.updateWhenOffscreen = true; // 1인칭에서 카메라가 몸 안에 있어도 팔이 그려지도록
+
+            // 스토리 그림(잠옷 차림)과 어울리도록 옷 텍스처를 바꿉니다 (LevelDatabase에서 지정)
+            if (db.playerBodyTexture != null)
+            {
+                MaterialPropertyBlock block = new MaterialPropertyBlock();
+                smr.GetPropertyBlock(block);
+                block.SetTexture("_MainTex", db.playerBodyTexture);
+                if (db.playerBodyNormal != null) block.SetTexture("_BumpMap", db.playerBodyNormal);
+                smr.SetPropertyBlock(block);
+            }
         }
 
         if (Camera.main != null)
         {
-            cam = Camera.main.transform;
+            camera3d = Camera.main;
+            cam = camera3d.transform;
             // 카메라를 캐릭터에서 떼어 내 LateUpdate에서 직접 배치합니다.
             cam.SetParent(null, true);
-            Camera.main.fieldOfView = fieldOfView;
-            Camera.main.nearClipPlane = 0.05f;
+            camera3d.fieldOfView = fieldOfView;
+            camera3d.nearClipPlane = 0.05f;
         }
         else
         {
@@ -169,6 +189,7 @@ public class FirstPersonController : MonoBehaviour
     {
         viewMode = viewMode == ViewMode.ThirdPerson ? ViewMode.FirstPerson : ViewMode.ThirdPerson;
         if (viewMode == ViewMode.ThirdPerson) RestoreHead();
+        SetBodyVisible(true);
         targetPitch = Mathf.Clamp(targetPitch, PitchMin, PitchMax);
         if (GameManager.Instance != null && GameManager.Instance.Hud != null)
         {
@@ -269,12 +290,28 @@ public class FirstPersonController : MonoBehaviour
         if (cam == null) return;
         if (viewMode == ViewMode.ThirdPerson) PlaceThirdPersonCamera();
         else PlaceFirstPersonCamera();
+
+        if (camera3d != null)
+        {
+            float wantedFov = viewMode == ViewMode.ThirdPerson ? fieldOfView : firstPersonFieldOfView;
+            camera3d.fieldOfView = Mathf.Lerp(camera3d.fieldOfView, wantedFov, 1f - Mathf.Exp(-8f * Time.deltaTime));
+        }
+    }
+
+    void SetBodyVisible(bool visible)
+    {
+        if (bodyRenderers == null) return;
+        foreach (SkinnedMeshRenderer smr in bodyRenderers)
+        {
+            if (smr != null && smr.enabled != visible) smr.enabled = visible;
+        }
     }
 
     void PlaceThirdPersonCamera()
     {
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
-        Vector3 pivot = transform.position + Vector3.up * cameraHeight;
+        // 회전 중심을 캐릭터 오른쪽으로 비켜 두면 캐릭터는 화면 왼쪽에, 조준점은 캐릭터 옆 빈 공간에 놓입니다.
+        Vector3 pivot = transform.position + Vector3.up * cameraHeight + Quaternion.Euler(0, yaw, 0) * Vector3.right * aimSideOffset;
         Vector3 desired = pivot + rotation * new Vector3(shoulderOffset, 0, -cameraDistance);
         Vector3 dir = desired - pivot;
         float wanted = dir.magnitude;
@@ -293,6 +330,9 @@ public class FirstPersonController : MonoBehaviour
 
         cam.position = pivot + dir * currentCameraDistance;
         cam.rotation = rotation;
+
+        // 좁은 방에서 카메라가 몸에 붙으면 몸이 화면을 다 가리므로 잠시 숨깁니다.
+        SetBodyVisible(currentCameraDistance >= hideBodyDistance);
     }
 
     void PlaceFirstPersonCamera()

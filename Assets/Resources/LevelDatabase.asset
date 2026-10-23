@@ -14,6 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boldFont: {fileID: 12800000, guid: 56533b9ba77f75a4eb646f21ec3cb87e, type: 3}
   lightFont: {fileID: 12800000, guid: efe063021c65341498c5fa7d4e853a73, type: 3}
+  playerBodyTexture: {fileID: 2800000, guid: 844304d49e7f40842826f9493497f663, type: 3}
+  playerBodyNormal: {fileID: 2800000, guid: 862710377481a5a48b8d68b0cc0d905f, type: 3}
   catPrefab: {fileID: 1526554761915109350, guid: 076879464bd682945aa7cd31ae139a36, type: 3}
   meowClip: {fileID: 8300000, guid: c99f4a878bbd8ec43b637c6a0bcf3460, type: 3}
   clickClip: {fileID: 8300000, guid: 2c5292ba5cf254919a6b9e2b18e04f49, type: 3}
@@ -44,13 +46,13 @@ MonoBehaviour:
     hiddenRatio: 1
     parTime: 60
     fixedSpawnPositions: []
-  - title: "\uBBF8\uBBF8\uC640 \uC5EC\uB984\uC774"
-    description: "\uB298 \uBD99\uC5B4 \uB2E4\uB2C8\uB358 \uBBF8\uBBF8\uC640 \uC5EC\uB984\uC774\uAC00 \uB530\uB85C\uB530\uB85C \uC228\uC5C8\uC5B4\uC694. \uC5B4\uB450\uC6B4 \uAD6C\uC11D\uB3C4 \uC798 \uC0B4\uD3B4\uBCF4\uC138\uC694."
+  - title: "\uBBF8\uBBF8\uC640 \uC5EC\uB984"
+    description: "\uB298 \uBD99\uC5B4 \uB2E4\uB2C8\uB358 \uBBF8\uBBF8\uC640 \uC5EC\uB984\uAC00 \uB530\uB85C\uB530\uB85C \uC228\uC5C8\uC5B4\uC694. \uC5B4\uB450\uC6B4 \uAD6C\uC11D\uB3C4 \uC798 \uC0B4\uD3B4\uBCF4\uC138\uC694."
     photo: {fileID: 2800000, guid: b1b06523b7f4d4f09b254d6d62229062, type: 3}
     targets:
     - catName: "\uBBF8\uBBF8"
       tint: {r: 0.13, g: 0.13, b: 0.15, a: 1}
-    - catName: "\uC5EC\uB984\uC774"
+    - catName: "\uC5EC\uB984"
       tint: {r: 1, g: 0.9, b: 0.7, a: 1}
     decoyCount: 0
     timeLimit: 240
@@ -80,7 +82,7 @@ MonoBehaviour:
       tint: {r: 0.3, g: 0.3, b: 0.33, a: 1}
     - catName: "\uBBF8\uBBF8"
       tint: {r: 0.13, g: 0.13, b: 0.15, a: 1}
-    - catName: "\uC5EC\uB984\uC774"
+    - catName: "\uC5EC\uB984"
       tint: {r: 1, g: 0.9, b: 0.7, a: 1}
     decoyCount: 2
     timeLimit: 300

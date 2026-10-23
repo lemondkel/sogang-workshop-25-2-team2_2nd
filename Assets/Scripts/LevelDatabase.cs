@@ -69,6 +69,11 @@ public class LevelDatabase : ScriptableObject
     public Font boldFont;
     public Font lightFont;
 
+    [Header("Player")]
+    [Tooltip("플레이어 캐릭터 옷 텍스처 (비우면 모델 기본값)")]
+    public Texture2D playerBodyTexture;
+    public Texture2D playerBodyNormal;
+
     [Header("Cat")]
     public GameObject catPrefab;
     public AudioClip meowClip;
