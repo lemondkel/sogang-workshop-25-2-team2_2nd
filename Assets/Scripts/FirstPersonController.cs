@@ -467,8 +467,8 @@ public class FirstPersonController : MonoBehaviour
         if (upLeg == null || leg == null) return;
         // 허벅지는 앞으로 올리고(-), 무릎은 뒤로 접고(+), 발은 바닥에 맞게 되돌립니다.
         upLeg.rotation = Quaternion.AngleAxis(-80f * crouchBlend, right) * upLeg.rotation;
-        leg.rotation = Quaternion.AngleAxis(112f * crouchBlend, right) * leg.rotation;
-        if (foot != null) foot.rotation = Quaternion.AngleAxis(-32f * crouchBlend, right) * foot.rotation;
+        leg.rotation = Quaternion.AngleAxis(100f * crouchBlend, right) * leg.rotation;
+        if (foot != null) foot.rotation = Quaternion.AngleAxis(-20f * crouchBlend, right) * foot.rotation;
     }
 
     void SetBodyVisible(bool visible)
