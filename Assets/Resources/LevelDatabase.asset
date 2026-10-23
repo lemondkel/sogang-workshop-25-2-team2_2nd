@@ -44,13 +44,13 @@ MonoBehaviour:
     hiddenRatio: 1
     parTime: 60
     fixedSpawnPositions: []
-  - title: "\uAE4C\uB9DD\uC774\uC640 \uCE58\uC988"
-    description: "\uB298 \uBD99\uC5B4 \uB2E4\uB2C8\uB358 \uAE4C\uB9DD\uC774\uC640 \uCE58\uC988\uAC00 \uB530\uB85C\uB530\uB85C \uC228\uC5C8\uC5B4\uC694. \uC5B4\uB450\uC6B4 \uAD6C\uC11D\uB3C4 \uC798 \uC0B4\uD3B4\uBCF4\uC138\uC694."
+  - title: "\uBBF8\uBBF8\uC640 \uC5EC\uB984\uC774"
+    description: "\uB298 \uBD99\uC5B4 \uB2E4\uB2C8\uB358 \uBBF8\uBBF8\uC640 \uC5EC\uB984\uC774\uAC00 \uB530\uB85C\uB530\uB85C \uC228\uC5C8\uC5B4\uC694. \uC5B4\uB450\uC6B4 \uAD6C\uC11D\uB3C4 \uC798 \uC0B4\uD3B4\uBCF4\uC138\uC694."
     photo: {fileID: 2800000, guid: b1b06523b7f4d4f09b254d6d62229062, type: 3}
     targets:
-    - catName: "\uAE4C\uB9DD\uC774"
+    - catName: "\uBBF8\uBBF8"
       tint: {r: 0.13, g: 0.13, b: 0.15, a: 1}
-    - catName: "\uCE58\uC988"
+    - catName: "\uC5EC\uB984\uC774"
       tint: {r: 1, g: 0.9, b: 0.7, a: 1}
     decoyCount: 0
     timeLimit: 240
@@ -78,9 +78,9 @@ MonoBehaviour:
       tint: {r: 0.85, g: 0.78, b: 0.68, a: 1}
     - catName: "\uD131\uC2DC"
       tint: {r: 0.3, g: 0.3, b: 0.33, a: 1}
-    - catName: "\uAE4C\uB9DD\uC774"
+    - catName: "\uBBF8\uBBF8"
       tint: {r: 0.13, g: 0.13, b: 0.15, a: 1}
-    - catName: "\uCE58\uC988"
+    - catName: "\uC5EC\uB984\uC774"
       tint: {r: 1, g: 0.9, b: 0.7, a: 1}
     decoyCount: 2
     timeLimit: 300
