@@ -55,7 +55,7 @@ public class IntroManager : MonoBehaviour
         ReplayStory();
     }
 
-    void ReplayStory()
+    public void ReplayStory()
     {
         titlePanel.SetActive(false);
         menu.SetTitleMenuVisible(false);

@@ -57,6 +57,18 @@ public class MenuUI : MonoBehaviour
         titleBar.gameObject.SetActive(visible);
     }
 
+    public void ShowSettings()
+    {
+        SettingsPanel.Build(screenRoot, null, null);
+    }
+
+    // 열려 있는 화면을 모두 닫고 타이틀로 돌아갑니다.
+    public void CloseScreens()
+    {
+        Clear();
+        SetTitleMenuVisible(true);
+    }
+
     void Clear()
     {
         for (int i = screenRoot.childCount - 1; i >= 0; i--) Destroy(screenRoot.GetChild(i).gameObject);

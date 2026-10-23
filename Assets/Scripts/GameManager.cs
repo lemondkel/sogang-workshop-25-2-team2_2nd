@@ -396,6 +396,13 @@ public class GameManager : MonoBehaviour
         EndLevel(cleared);
     }
 
+    // 화면 점검(ScreenTour)용: 결과/시간 초과 화면을 바로 띄웁니다.
+    public void DebugEndLevel(bool cleared)
+    {
+        if (CurrentGameState == GameState.GameOver) return;
+        EndLevel(cleared);
+    }
+
     void EndLevel(bool cleared)
     {
         ChangeState(GameState.GameOver);
