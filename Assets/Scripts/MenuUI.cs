@@ -306,7 +306,8 @@ public class MenuUI : MonoBehaviour
             "WASD 또는 ↑↓ 로 걷기\n" +
             "마우스 또는 ←→ 로 둘러보기\n" +
             "V 로 1인칭/3인칭 시점 전환\n" +
-            "발바닥 커서가 주황색으로 커지면 클릭(또는 E)으로 찾기\n" +
+            "Space 점프 · Ctrl 앉기 (가구 밑 들여다보기)\n" +
+            "발바닥 커서가 주황색이 되고 [E] 안내가 뜨면 E 로 상호작용\n" +
             "ESC / P 일시정지";
         string right =
             "<color=#F08048>힌트 (H)</color>\n" +

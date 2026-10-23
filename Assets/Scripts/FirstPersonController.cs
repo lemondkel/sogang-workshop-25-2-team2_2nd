@@ -4,8 +4,9 @@
 /// 고양이 찾기용 탐색 조작입니다. (클래스 이름은 씬 참조 유지를 위해 그대로 둡니다)
 /// - 기본: 캐릭터가 보이는 어깨 너머 3인칭 시점. 캐릭터가 이동 방향으로 부드럽게 돌아서서 걷습니다.
 /// - V 키: 1인칭 시점으로 전환. 머리는 숨기고 두 손이 화면 앞에 보이도록 팔을 올립니다.
-/// - 이동: WASD / ↑↓ (A·D는 옆걸음, ←→는 시점 회전), 마우스로 둘러보기, 클릭 또는 E로 찾기.
-/// 점프·앉기는 없앴습니다. 느긋하게 집 안을 둘러보는 느낌에 맞춰 속도와 가감속을 낮췄습니다.
+/// - 이동: WASD / ↑↓ (A·D는 옆걸음, ←→는 시점 회전), 마우스로 둘러보기, E(또는 클릭)로 상호작용.
+/// - Space 점프, Ctrl 앉기(가구 밑을 들여다보기). 모델에 앉기 동작이 없어서 앉은 자세는 뼈를 직접 굽혀 만듭니다.
+/// 느긋하게 집 안을 둘러보는 느낌에 맞춰 속도와 가감속을 낮췄습니다.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class FirstPersonController : MonoBehaviour
@@ -19,6 +20,17 @@ public class FirstPersonController : MonoBehaviour
     [Tooltip("캐릭터가 이동 방향으로 도는 속도 (도/초)")]
     public float turnSpeed = 480f;
     public float gravity = 20f;
+    public float jumpSpeed = 5f;
+
+    [Header("Crouch")]
+    public KeyCode crouchKey = KeyCode.LeftControl;
+    public float standHeight = 1.75f;
+    public float crouchHeight = 1.05f;
+    public float crouchSpeedMultiplier = 0.55f;
+    [Tooltip("앉았을 때 엉덩이(Hips)를 내리는 높이")]
+    public float crouchHipsDrop = 0.42f;
+    private bool isCrouching;
+    private float crouchBlend; // 0 서 있음 ~ 1 앉음 (부드럽게 전환)
 
     [Header("Look")]
     public float mouseSensitivity = 2.0f;
@@ -55,6 +67,8 @@ public class FirstPersonController : MonoBehaviour
     private Transform cam;
     private Animator animator;
     private Transform head, leftArm, leftForeArm, leftHand, rightArm, rightForeArm, rightHand;
+    private Transform hips, spine, leftUpLeg, leftLeg, leftFoot, rightUpLeg, rightLeg, rightFoot;
+    private string interactLabel;
 
     private float yaw, pitch, targetYaw, targetPitch;
     private Vector3 planarVelocity;
@@ -160,6 +174,14 @@ public class FirstPersonController : MonoBehaviour
         rightArm = FindDeep("RightArm");
         rightForeArm = FindDeep("RightForeArm");
         rightHand = FindDeep("RightHand");
+        hips = FindDeep("Hips");
+        spine = FindDeep("Spine");
+        leftUpLeg = FindDeep("LeftUpLeg");
+        leftLeg = FindDeep("LeftLeg");
+        leftFoot = FindDeep("LeftFoot");
+        rightUpLeg = FindDeep("RightUpLeg");
+        rightLeg = FindDeep("RightLeg");
+        rightFoot = FindDeep("RightFoot");
     }
 
     // 뼈 이름은 리그마다 접두사가 달라서(genSuit_Head, mixamorig:Head ...) 끝부분으로 찾습니다.
@@ -190,8 +212,33 @@ public class FirstPersonController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.V)) ToggleView();
 
         UpdateLook();
+        UpdateCrouch();
         UpdateMove();
         UpdateInteraction();
+    }
+
+    void UpdateCrouch()
+    {
+        bool wantCrouch = Input.GetKey(crouchKey);
+        if (wantCrouch && !isCrouching)
+        {
+            isCrouching = true;
+        }
+        else if (!wantCrouch && isCrouching)
+        {
+            // 천장(가구 밑)에 막혀 있으면 일어나지 않습니다.
+            Vector3 bottom = transform.position + Vector3.up * (crouchHeight - 0.1f);
+            Vector3 top = transform.position + Vector3.up * (standHeight - 0.3f);
+            if (!Physics.CheckCapsule(bottom, top, characterController.radius * 0.9f, EnvironmentMask, QueryTriggerInteraction.Ignore))
+            {
+                isCrouching = false;
+            }
+        }
+
+        crouchBlend = Mathf.MoveTowards(crouchBlend, isCrouching ? 1f : 0f, Time.deltaTime * 6f);
+        float height = Mathf.Lerp(standHeight, crouchHeight, crouchBlend);
+        characterController.height = height;
+        characterController.center = new Vector3(0, height * 0.5f + 0.02f, 0);
     }
 
     public void ToggleView()
@@ -232,12 +279,20 @@ public class FirstPersonController : MonoBehaviour
 
         Quaternion viewRotation = Quaternion.Euler(0, yaw, 0);
         Vector3 wish = viewRotation * new Vector3(strafeInput, 0, forwardInput);
-        wish = Vector3.ClampMagnitude(wish, 1f) * walkSpeed;
+        float speed = walkSpeed * Mathf.Lerp(1f, crouchSpeedMultiplier, crouchBlend);
+        wish = Vector3.ClampMagnitude(wish, 1f) * speed;
 
         planarVelocity = Vector3.MoveTowards(planarVelocity, wish, acceleration * Time.deltaTime);
 
-        if (characterController.isGrounded) verticalVelocity = -2f;
-        else verticalVelocity -= gravity * Time.deltaTime;
+        if (characterController.isGrounded)
+        {
+            verticalVelocity = -2f;
+            if (Input.GetButtonDown("Jump") && !isCrouching) verticalVelocity = jumpSpeed;
+        }
+        else
+        {
+            verticalVelocity -= gravity * Time.deltaTime;
+        }
 
         characterController.Move((planarVelocity + Vector3.up * verticalVelocity) * Time.deltaTime);
 
@@ -288,8 +343,17 @@ public class FirstPersonController : MonoBehaviour
             }
         }
 
+        // 화면 아래 "E 안아주기" 안내 (옆집 고양이가 들통나지 않도록 이름은 쓰지 않습니다)
+        string label = null;
+        if (target != null)
+        {
+            label = target.GetComponent<HiddenCat>() != null ? "안아주기" : "살펴보기";
+        }
+        if (GameManager.Instance.Hud != null) GameManager.Instance.Hud.SetInteractPrompt(label);
+
         if (target != null && (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.E)))
         {
+            if (GameManager.Instance.Hud != null) GameManager.Instance.Hud.PulseInteractPrompt();
             target.HandleClick();
         }
         GameManager.Instance.SetCrosshairVisuals(target != null);
@@ -298,6 +362,7 @@ public class FirstPersonController : MonoBehaviour
     void LateUpdate()
     {
         if (cam == null) return;
+        ApplyCrouchPose();
         if (viewMode == ViewMode.ThirdPerson) PlaceThirdPersonCamera();
         else PlaceFirstPersonCamera();
 
@@ -306,6 +371,31 @@ public class FirstPersonController : MonoBehaviour
             float wantedFov = viewMode == ViewMode.ThirdPerson ? fieldOfView : firstPersonFieldOfView;
             camera3d.fieldOfView = Mathf.Lerp(camera3d.fieldOfView, wantedFov, 1f - Mathf.Exp(-8f * Time.deltaTime));
         }
+    }
+
+    /// <summary>
+    /// 모델에 앉기 애니메이션이 없어서, 애니메이터가 포즈를 쓴 뒤(LateUpdate) 엉덩이를 내리고
+    /// 허벅지·무릎·발목을 굽혀 쪼그려 앉은 자세를 만듭니다. crouchBlend로 서서히 섞입니다.
+    /// </summary>
+    void ApplyCrouchPose()
+    {
+        if (crouchBlend <= 0.001f || hips == null) return;
+
+        Vector3 right = transform.right;
+        hips.position += Vector3.down * (crouchHipsDrop * crouchBlend);
+        if (spine != null) spine.rotation = Quaternion.AngleAxis(22f * crouchBlend, right) * spine.rotation;
+
+        BendLeg(leftUpLeg, leftLeg, leftFoot, right);
+        BendLeg(rightUpLeg, rightLeg, rightFoot, right);
+    }
+
+    void BendLeg(Transform upLeg, Transform leg, Transform foot, Vector3 right)
+    {
+        if (upLeg == null || leg == null) return;
+        // 허벅지는 앞으로 올리고(-), 무릎은 뒤로 접고(+), 발은 바닥에 맞게 되돌립니다.
+        upLeg.rotation = Quaternion.AngleAxis(-80f * crouchBlend, right) * upLeg.rotation;
+        leg.rotation = Quaternion.AngleAxis(112f * crouchBlend, right) * leg.rotation;
+        if (foot != null) foot.rotation = Quaternion.AngleAxis(-32f * crouchBlend, right) * foot.rotation;
     }
 
     void SetBodyVisible(bool visible)
@@ -325,7 +415,7 @@ public class FirstPersonController : MonoBehaviour
 
         // 회전 중심을 캐릭터 오른쪽으로 비켜 두면 캐릭터는 화면 왼쪽에, 조준점은 캐릭터 옆 빈 공간에 놓입니다.
         // 오른쪽이 벽이면 그만큼만 비킵니다 (회전 중심이 벽 속으로 들어가면 카메라도 벽 속에 생깁니다).
-        Vector3 center = transform.position + Vector3.up * cameraHeight;
+        Vector3 center = transform.position + Vector3.up * Mathf.Lerp(cameraHeight, cameraHeight - crouchHipsDrop, crouchBlend);
         Vector3 side = Quaternion.Euler(0, yaw, 0) * Vector3.right;
         float sideLength = aimSideOffset;
         if (Physics.SphereCast(center, cameraRadius, side, out hit, aimSideOffset, mask, QueryTriggerInteraction.Ignore))

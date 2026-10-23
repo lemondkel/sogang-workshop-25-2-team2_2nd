@@ -27,6 +27,11 @@ public class GameHUD : MonoBehaviour
     private Transform hintTarget;
     private float hintUntil;
     private Coroutine toastRoutine;
+    private CanvasGroup promptGroup;
+    private RectTransform promptRect;
+    private Text promptLabel;
+    private string promptText;
+    private float promptPulse;
 
     public void Build(GameManager manager)
     {
@@ -38,6 +43,7 @@ public class GameHUD : MonoBehaviour
         BuildTopBar();
         BuildToast();
         BuildHintArrow();
+        BuildInteractPrompt();
 
         overlayRoot = UIKit.Stretch(UIKit.Rect(canvas.transform, "Overlays"));
     }
@@ -72,7 +78,7 @@ public class GameHUD : MonoBehaviour
 
         // 아래: 조작 안내 + 힌트
         Image bottom = UIKit.Panel(hudRoot, "Controls", new Color(0, 0, 0, 0.35f));
-        UIKit.Fixed(bottom.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(1400, 60));
+        UIKit.Fixed(bottom.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(1560, 60));
         hintText = UIKit.Label(bottom.transform, "", 28, Color.white);
         UIKit.Stretch(hintText.rectTransform);
     }
@@ -86,6 +92,61 @@ public class GameHUD : MonoBehaviour
         toastGroup = toast.gameObject.AddComponent<CanvasGroup>();
         toastGroup.alpha = 0f;
         toastGroup.blocksRaycasts = false;
+    }
+
+    // 화면 아래쪽 "[E] 안아주기" 안내. 바라보는 대상이 생기면 서서히 나타나고, 사라지면 서서히 꺼집니다.
+    void BuildInteractPrompt()
+    {
+        Image card = UIKit.Card(hudRoot, "InteractPrompt");
+        promptRect = UIKit.Fixed(card.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 110), new Vector2(360, 86));
+        promptGroup = card.gameObject.AddComponent<CanvasGroup>();
+        promptGroup.alpha = 0f;
+        promptGroup.blocksRaycasts = false;
+
+        // 키캡
+        Image key = UIKit.Panel(card.transform, "Key", Color.white);
+        UIKit.Fixed(key.rectTransform, new Vector2(0, 0.5f), new Vector2(14, 0), new Vector2(58, 58));
+        Outline keyOutline = key.gameObject.AddComponent<Outline>();
+        keyOutline.effectColor = UIKit.Brown;
+        keyOutline.effectDistance = new Vector2(3, -3);
+        Text keyText = UIKit.Label(key.transform, "E", 36, UIKit.Brown);
+        UIKit.Stretch(keyText.rectTransform);
+
+        promptLabel = UIKit.Label(card.transform, "", 34, UIKit.Brown, TextAnchor.MiddleLeft);
+        UIKit.Place(promptLabel.rectTransform, Vector2.zero, Vector2.one, new Vector2(88, 0), new Vector2(-16, 0));
+    }
+
+    public void SetInteractPrompt(string label)
+    {
+        if (!string.IsNullOrEmpty(label))
+        {
+            promptText = label;
+            promptLabel.text = label;
+        }
+        else
+        {
+            promptText = null;
+        }
+    }
+
+    // E를 눌렀을 때 살짝 튀는 효과
+    public void PulseInteractPrompt()
+    {
+        promptPulse = 1f;
+    }
+
+    void UpdateInteractPrompt()
+    {
+        if (promptGroup == null) return;
+        bool show = promptText != null && gm.CurrentGameState == GameManager.GameState.Playing;
+        float target = show ? 1f : 0f;
+        float speed = show ? 7f : 4f; // 나타날 때는 빠르게, 사라질 때는 천천히
+        promptGroup.alpha = Mathf.MoveTowards(promptGroup.alpha, target, Time.unscaledDeltaTime * speed);
+
+        promptPulse = Mathf.MoveTowards(promptPulse, 0f, Time.unscaledDeltaTime * 5f);
+        float scale = Mathf.Lerp(0.9f, 1f, promptGroup.alpha) + Mathf.Sin(promptPulse * Mathf.PI) * 0.12f;
+        promptRect.localScale = Vector3.one * scale;
+        promptRect.anchoredPosition = new Vector2(0, 110 + (1f - promptGroup.alpha) * -16f);
     }
 
     void BuildHintArrow()
@@ -120,9 +181,10 @@ public class GameHUD : MonoBehaviour
 
         catsText.text = $"고양이  <color=#F08048>{gm.CatsFound}</color> / {gm.CatsTotal}";
         cluesText.text = $"단서  {gm.CluesFound} / {GameManager.ClueCount}";
-        hintText.text = $"WASD·방향키 이동 · 마우스/←→ 둘러보기 · 클릭/E 찾기 · <color=#FFC428>H 힌트 ({gm.HintsLeft})</color> · V 시점 · ESC 일시정지";
+        hintText.text = $"WASD·방향키 이동 · 마우스/←→ 둘러보기 · E 상호작용 · Space 점프 · Ctrl 앉기 · <color=#FFC428>H 힌트 ({gm.HintsLeft})</color> · V 시점 · ESC";
 
         UpdateHintArrow();
+        UpdateInteractPrompt();
     }
 
     void UpdateHintArrow()
