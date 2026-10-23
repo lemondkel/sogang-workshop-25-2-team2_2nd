@@ -72,7 +72,7 @@ public class GameHUD : MonoBehaviour
 
         // 아래: 조작 안내 + 힌트
         Image bottom = UIKit.Panel(hudRoot, "Controls", new Color(0, 0, 0, 0.35f));
-        UIKit.Fixed(bottom.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(1100, 60));
+        UIKit.Fixed(bottom.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 20), new Vector2(1400, 60));
         hintText = UIKit.Label(bottom.transform, "", 28, Color.white);
         UIKit.Stretch(hintText.rectTransform);
     }
@@ -120,7 +120,7 @@ public class GameHUD : MonoBehaviour
 
         catsText.text = $"고양이  <color=#F08048>{gm.CatsFound}</color> / {gm.CatsTotal}";
         cluesText.text = $"단서  {gm.CluesFound} / {GameManager.ClueCount}";
-        hintText.text = $"WASD 이동 · 클릭/E 찾기 · <color=#FFC428>H 힌트 ({gm.HintsLeft})</color> · ESC 일시정지";
+        hintText.text = $"WASD·방향키 이동 · 마우스/←→ 둘러보기 · 클릭/E 찾기 · <color=#FFC428>H 힌트 ({gm.HintsLeft})</color> · V 시점 · ESC 일시정지";
 
         UpdateHintArrow();
     }

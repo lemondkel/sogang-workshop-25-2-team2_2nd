@@ -75,6 +75,8 @@ public class GameManager : MonoBehaviour
     private readonly List<HiddenCat> cats = new List<HiddenCat>();
     private readonly HashSet<int> foundClues = new HashSet<int>();
     private GameHUD hud;
+    public GameHUD Hud { get { return hud; } }
+    private bool usingPawCursor;
     private FirstPersonController player;
     private bool pointerWasLocked;
 
@@ -102,6 +104,8 @@ public class GameManager : MonoBehaviour
 
         hud = gameObject.AddComponent<GameHUD>();
         hud.Build(this);
+
+        SetupPawCursor();
 
         // 미션 안내 화면에서 '시작!'을 누르면 플레이 시작 (WebGL에서 마우스 잠금에 클릭이 필요하기도 합니다)
         SetCursorFree(true);
@@ -458,10 +462,39 @@ public class GameManager : MonoBehaviour
 
     // ===== 기존 기능 =====
 
+    // FPS 조준점 대신 고양이 발바닥 커서를 씁니다. 찾을 수 있는 고양이를 보면 커지면서 주황색으로 바뀝니다.
+    void SetupPawCursor()
+    {
+        Sprite paw = Resources.Load<Sprite>("UI/paw");
+        if (paw == null || targetVisualObject == null) return;
+
+        Image image = targetVisualObject.GetComponent<Image>();
+        if (image == null) return;
+
+        defaultSprite = paw;
+        highlightedSprite = paw;
+        image.sprite = paw;
+        image.preserveAspect = true;
+        image.rectTransform.sizeDelta = new Vector2(46, 46);
+        image.color = new Color(1f, 1f, 1f, 0.55f);
+        usingPawCursor = true;
+    }
+
     public void SetCrosshairVisuals(bool isTargetingClickable)
     {
         if (targetVisualObject == null || defaultSprite == null || highlightedSprite == null)
         {
+            return;
+        }
+
+        if (usingPawCursor)
+        {
+            Image paw = targetVisualObject.GetComponent<Image>();
+            Color wanted = isTargetingClickable ? UIKit.Orange : new Color(1f, 1f, 1f, 0.55f);
+            float scale = isTargetingClickable ? 1.35f : 1f;
+            float k = 1f - Mathf.Exp(-14f * Time.unscaledDeltaTime);
+            paw.color = Color.Lerp(paw.color, wanted, k);
+            paw.rectTransform.localScale = Vector3.Lerp(paw.rectTransform.localScale, Vector3.one * scale, k);
             return;
         }
 

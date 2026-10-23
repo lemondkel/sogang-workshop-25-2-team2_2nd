@@ -91,6 +91,16 @@ public class ScreenTour : MonoBehaviour
         yield return Wait(0.4f);
         yield return Shot("13_hint");
 
+        FirstPersonController player = FindObjectOfType<FirstPersonController>();
+        if (player != null)
+        {
+            player.ToggleView();
+            yield return Wait(0.6f);
+            yield return Shot("13b_hud_firstperson");
+            player.ToggleView();
+            yield return Wait(0.3f);
+        }
+
         gm.Pause();
         yield return Shot("14_pause");
         gm.Resume();
