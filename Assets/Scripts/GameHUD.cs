@@ -217,6 +217,10 @@ public class GameHUD : MonoBehaviour
         Text body = UIKit.Label(right, rules, 36, UIKit.Brown, TextAnchor.UpperLeft, false);
         UIKit.Place(body.rectTransform, Vector2.zero, new Vector2(1, 1), Vector2.zero, new Vector2(0, -190));
         body.lineSpacing = 1.15f;
+        body.verticalOverflow = VerticalWrapMode.Truncate;
+        body.resizeTextForBestFit = true;
+        body.resizeTextMinSize = 20;
+        body.resizeTextMaxSize = 36;
 
         Button back = UIKit.Button(card.transform, "레벨 선택", () => gm.GoToLevelSelect(), UIKit.Gray, 38);
         UIKit.Fixed((RectTransform)back.transform, new Vector2(1, 0), new Vector2(-440, 50), new Vector2(280, 100));

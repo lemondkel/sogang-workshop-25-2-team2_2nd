@@ -226,16 +226,17 @@ public class MenuUI : MonoBehaviour
         SetTitleMenuVisible(false);
         Image bg = FullScreen("HowToPlay", "게임 방법", () => SetTitleMenuVisible(true));
 
-        Image card = UIKit.Card(bg.transform, "Card");
-        UIKit.Place(card.rectTransform, Vector2.zero, Vector2.one, new Vector2(260, 80), new Vector2(-260, -190));
-
-        string text =
+        string left =
             "<color=#F08048>목표</color>\n" +
             "레벨마다 보여주는 사진 속 고양이를 집 안에서 모두 찾아주세요.\n" +
             "레벨 2부터는 고양이가 판마다 다른 곳에 숨어요!\n\n" +
             "<color=#F08048>조작</color>\n" +
-            "WASD 이동 · 마우스 둘러보기 · Ctrl 앉기 · Space 점프\n" +
-            "화면 가운데 조준점이 바뀌면 클릭(또는 E)으로 찾기\n\n" +
+            "WASD 이동\n" +
+            "마우스 둘러보기\n" +
+            "Ctrl 앉기 · Space 점프\n" +
+            "조준점이 바뀌면 클릭(또는 E)으로 찾기\n" +
+            "ESC / P 일시정지";
+        string right =
             "<color=#F08048>힌트 (H)</color>\n" +
             "가장 가까운 고양이가 \"야옹~\" 울고, 방향 화살표가 잠깐 나타나요.\n" +
             "힌트를 쓰지 않으면 별을 더 받을 수 있어요.\n\n" +
@@ -243,8 +244,23 @@ public class MenuUI : MonoBehaviour
             "사진과 다른 색의 고양이를 누르면 시간이 깎여요.\n\n" +
             "<color=#F08048>단서</color>\n" +
             "집 안 곳곳의 단서를 찾으면 점수와 앨범 기록이 남아요.";
+
+        HowToCard(bg.transform, "Left", left, new Vector2(0, 0), new Vector2(0.5f, 1), new Vector2(120, 70), new Vector2(-20, -190));
+        HowToCard(bg.transform, "Right", right, new Vector2(0.5f, 0), new Vector2(1, 1), new Vector2(20, 70), new Vector2(-120, -190));
+    }
+
+    void HowToCard(Transform parent, string name, string text, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
+    {
+        Image card = UIKit.Card(parent, name);
+        UIKit.Place(card.rectTransform, anchorMin, anchorMax, offsetMin, offsetMax);
+
         Text body = UIKit.Label(card.transform, text, 36, UIKit.Brown, TextAnchor.UpperLeft, false);
-        UIKit.Place(body.rectTransform, Vector2.zero, Vector2.one, new Vector2(60, 40), new Vector2(-60, -40));
+        UIKit.Place(body.rectTransform, Vector2.zero, Vector2.one, new Vector2(50, 40), new Vector2(-50, -40));
         body.lineSpacing = 1.1f;
+        // 화면 비율이 달라도 카드 밖으로 넘치지 않게 글자 크기를 자동으로 줄입니다.
+        body.verticalOverflow = VerticalWrapMode.Truncate;
+        body.resizeTextForBestFit = true;
+        body.resizeTextMinSize = 20;
+        body.resizeTextMaxSize = 36;
     }
 }
