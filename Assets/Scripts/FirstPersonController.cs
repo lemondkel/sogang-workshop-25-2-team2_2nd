@@ -68,7 +68,6 @@ public class FirstPersonController : MonoBehaviour
     private Animator animator;
     private Transform head, leftArm, leftForeArm, leftHand, rightArm, rightForeArm, rightHand;
     private Transform hips, spine, leftUpLeg, leftLeg, leftFoot, rightUpLeg, rightLeg, rightFoot;
-    private string interactLabel;
 
     private float yaw, pitch, targetYaw, targetPitch;
     private Vector3 planarVelocity;
@@ -76,6 +75,14 @@ public class FirstPersonController : MonoBehaviour
     private float currentCameraDistance;
     private bool invertY;
     private readonly RaycastHit[] hits = new RaycastHit[16];
+    private readonly RaycastHit[] blockers = new RaycastHit[16];
+
+    // 앉기 포즈를 덮어쓴 뼈들. 애니메이터가 매 프레임 다시 쓰지 않는 뼈(예: Hips 위치)는
+    // 우리가 더한 값이 프레임마다 쌓이므로, 지난 프레임에 쓴 값을 기억했다가 되돌립니다.
+    private Transform[] crouchBones;
+    private Vector3[] crouchPrePos, crouchPostPos;
+    private Quaternion[] crouchPreRot, crouchPostRot;
+    private bool crouchPoseWritten;
 
     // 1인칭 손 위치 (카메라 기준). 오른손은 간식을 든 것처럼 조금 더 앞에.
     // 팔이 쭉 펴진 '좀비 자세'가 되지 않도록 조금 가깝고 낮게 (화면 아래쪽 1/3에 보입니다)
@@ -101,6 +108,23 @@ public class FirstPersonController : MonoBehaviour
         }
     }
 
+    // 상호작용 레이캐스트 마스크: Inspector 값에 더해 Clickable과 단서 레이어(Quest1~5)는 항상 포함합니다.
+    int InteractMask
+    {
+        get
+        {
+            int mask = clickableLayerMask.value;
+            int clickable = LayerMask.NameToLayer("Clickable");
+            if (clickable >= 0) mask |= 1 << clickable;
+            for (int i = 1; i <= 5; i++)
+            {
+                int quest = LayerMask.NameToLayer("Quest" + i);
+                if (quest >= 0) mask |= 1 << quest;
+            }
+            return mask;
+        }
+    }
+
     void Awake()
     {
         characterController = GetComponent<CharacterController>();
@@ -117,6 +141,11 @@ public class FirstPersonController : MonoBehaviour
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         }
         FindBones();
+        crouchBones = new Transform[] { hips, spine, leftUpLeg, leftLeg, leftFoot, rightUpLeg, rightLeg, rightFoot };
+        crouchPrePos = new Vector3[crouchBones.Length];
+        crouchPostPos = new Vector3[crouchBones.Length];
+        crouchPreRot = new Quaternion[crouchBones.Length];
+        crouchPostRot = new Quaternion[crouchBones.Length];
         bodyRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
         LevelDatabase db = LevelDatabase.Load();
         foreach (SkinnedMeshRenderer smr in bodyRenderers)
@@ -325,7 +354,16 @@ public class FirstPersonController : MonoBehaviour
 
         Ray ray = new Ray(cam.position, cam.forward);
         float maxDistance = raycastHitDistance + (viewMode == ViewMode.ThirdPerson ? currentCameraDistance : 0f);
-        int count = Physics.RaycastNonAlloc(ray, hits, maxDistance, clickableLayerMask);
+        int count = Physics.RaycastNonAlloc(ray, hits, maxDistance, InteractMask);
+
+        // 벽·가구 뒤에 숨은 고양이가 안내 문구로 들통나지 않도록, 시선과 대상 사이를 가리는 것이 있는지 봅니다.
+        float nearestBlocker = float.MaxValue;
+        int blockerCount = Physics.RaycastNonAlloc(ray, blockers, maxDistance, EnvironmentMask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < blockerCount; i++)
+        {
+            if (blockers[i].collider.transform.IsChildOf(transform)) continue;
+            if (blockers[i].distance < nearestBlocker) nearestBlocker = blockers[i].distance;
+        }
 
         ClickableObject target = null;
         float best = float.MaxValue;
@@ -335,6 +373,7 @@ public class FirstPersonController : MonoBehaviour
             RaycastHit hit = hits[i];
             if (hit.collider.transform.IsChildOf(transform)) continue; // 내 몸은 제외
             if (!hit.collider.enabled || hit.distance >= best) continue;
+            if (hit.distance > nearestBlocker + 0.02f) continue; // 가려져 있음
             if (viewMode == ViewMode.ThirdPerson && Vector3.Distance(hit.point, reachFrom) > reachDistance) continue;
             if (hit.collider.gameObject.TryGetComponent<ClickableObject>(out var clickable))
             {
@@ -379,7 +418,15 @@ public class FirstPersonController : MonoBehaviour
     /// </summary>
     void ApplyCrouchPose()
     {
+        RestoreCrouchPose();
         if (crouchBlend <= 0.001f || hips == null) return;
+
+        for (int i = 0; i < crouchBones.Length; i++)
+        {
+            if (crouchBones[i] == null) continue;
+            crouchPrePos[i] = crouchBones[i].localPosition;
+            crouchPreRot[i] = crouchBones[i].localRotation;
+        }
 
         Vector3 right = transform.right;
         hips.position += Vector3.down * (crouchHipsDrop * crouchBlend);
@@ -387,6 +434,32 @@ public class FirstPersonController : MonoBehaviour
 
         BendLeg(leftUpLeg, leftLeg, leftFoot, right);
         BendLeg(rightUpLeg, rightLeg, rightFoot, right);
+
+        for (int i = 0; i < crouchBones.Length; i++)
+        {
+            if (crouchBones[i] == null) continue;
+            crouchPostPos[i] = crouchBones[i].localPosition;
+            crouchPostRot[i] = crouchBones[i].localRotation;
+        }
+        crouchPoseWritten = true;
+    }
+
+    /// <summary>
+    /// 지난 프레임에 앉기 포즈로 덮어쓴 뼈가 애니메이터에 의해 다시 쓰이지 않았다면(값이 그대로라면)
+    /// 덮어쓰기 전 포즈로 되돌립니다. 그래야 엉덩이 내림/관절 굽힘이 프레임마다 누적되지 않습니다.
+    /// </summary>
+    void RestoreCrouchPose()
+    {
+        if (!crouchPoseWritten || crouchBones == null) return;
+        for (int i = 0; i < crouchBones.Length; i++)
+        {
+            Transform bone = crouchBones[i];
+            if (bone == null) continue;
+            // 위치와 회전은 따로 봅니다 (애니메이션이 Hips 회전만 쓰고 위치는 안 쓰는 경우가 흔합니다).
+            if ((bone.localPosition - crouchPostPos[i]).sqrMagnitude < 1e-8f) bone.localPosition = crouchPrePos[i];
+            if (Quaternion.Angle(bone.localRotation, crouchPostRot[i]) < 0.01f) bone.localRotation = crouchPreRot[i];
+        }
+        crouchPoseWritten = false;
     }
 
     void BendLeg(Transform upLeg, Transform leg, Transform foot, Vector3 right)
