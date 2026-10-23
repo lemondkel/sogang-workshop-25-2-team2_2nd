@@ -34,6 +34,7 @@ public class FirstPersonController : MonoBehaviour
     private float targetHeight;
     private bool isCrouching = false;
     private float xRotation = 0f;
+    private bool invertY = false;
 
     void Awake()
     {
@@ -53,13 +54,28 @@ public class FirstPersonController : MonoBehaviour
         // 마우스 커서 잠금 및 숨기기
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        ApplySettings();
+    }
+
+    // 설정 화면에서 바꾼 마우스 감도/반전을 적용합니다.
+    public void ApplySettings()
+    {
+        mouseSensitivity = GameSession.MouseSensitivity;
+        invertY = GameSession.InvertY;
     }
 
     void Update()
     {
+        // 미션 안내/일시정지/결과 화면에서는 시점과 이동을 멈춥니다.
+        if (GameManager.Instance != null && GameManager.Instance.CurrentGameState != GameManager.GameState.Playing)
+        {
+            return;
+        }
+
         // 🌟 마우스 시점 조작 🌟
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * (invertY ? -1f : 1f);
 
         // 1. 좌우 회전 (플레이어 본체)
         transform.Rotate(Vector3.up * mouseX);
@@ -91,8 +107,8 @@ public class FirstPersonController : MonoBehaviour
                     // 3. 클릭 입력 처리
                     if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.E)) // 마우스 왼쪽 버튼 클릭
                     {
-                        // 4. GameManager를 통해 클릭 이벤트 전달 (점수 획득, 파괴 시퀀스 시작)
-                        GameManager.Instance.OnObjectClicked(hit.collider.gameObject);
+                        // 4. ClickableObject를 통해 클릭 처리 (OnMouseDown과 같은 경로라 중복 처리되지 않습니다)
+                        clickableObject.HandleClick();
                     }
                 }
             }
@@ -104,11 +120,12 @@ public class FirstPersonController : MonoBehaviour
 
         float currentSpeed = isCrouching ? walkingSpeed * crouchSpeedMultiplier : walkingSpeed;
 
-        // --- W/S 앞뒤 이동 처리 ---
+        // --- W/S 앞뒤 이동, A/D 옆걸음 처리 ---
         if (characterController.isGrounded)
         {
             float verticalInput = Input.GetAxis("Vertical");
-            Vector3 input = new Vector3(0, 0, verticalInput);
+            float horizontalInput = Input.GetAxis("Horizontal");
+            Vector3 input = Vector3.ClampMagnitude(new Vector3(horizontalInput, 0, verticalInput), 1f);
 
             moveDirection = transform.TransformDirection(input) * currentSpeed;
 

@@ -2,30 +2,32 @@
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Collections; // 코루틴(IEnumerator) 사용을 위해 추가
+using System.Collections.Generic;
 
 public class GameManager : MonoBehaviour
 {
-    // 싱글턴 인스턴스
+    // 싱글턴 인스턴스 (MainScene마다 새로 만들어집니다)
     public static GameManager Instance { get; private set; }
 
     // 게임 상태
     public enum GameState
     {
-        Starting, // 게임 시작 중
+        Starting, // 미션 안내 화면 (시작 버튼 대기)
         Playing, // 플레이 중
         Paused,// 일시정지
-        GameOver // 게임 오버
+        GameOver // 게임 종료 (클리어 또는 시간 초과)
     }
     public GameState CurrentGameState { get; private set; }
 
     private int score = 0;
     public int Score { get { return score; } set { score = value; Debug.Log("[GameManager] 점수 업데이트: " + score); } }
 
-    private int remainingObjectCount = 0; // 남은 개수 추적용
+    private int remainingObjectCount = 0; // 남은 고양이 수
 
     [Header("Object Spawner")]
+    [Tooltip("LevelDatabase에 고양이 프리팹이 없을 때 사용합니다.")]
     public GameObject prefabToSpawn;
-    [Tooltip("유니티 인스펙터에서 직접 생성할 위치를 지정합니다.")]
+    [Tooltip("레벨에 위치가 지정되지 않았을 때 첫 번째 고양이를 우선 배치할 위치입니다. 비우면 자동 탐색합니다.")]
     public Vector3[] spawnPositionsFromInspector;
 
     [Header("Target Visuals (Crosshair/Focus Object)")]
@@ -51,108 +53,234 @@ public class GameManager : MonoBehaviour
     [Tooltip("퀘스트5 패널")]
     public GameObject quest5Object;
 
+    // ===== 레벨 진행 상태 =====
+    public int LevelIndex { get; private set; }
+    public CatLevel Level { get; private set; }
+    public float ElapsedTime { get; private set; }
+    public float PenaltyTime { get; private set; }
+    public int HintsLeft { get; private set; }
+    public int HintsUsed { get; private set; }
+    public int WrongClicks { get; private set; }
+    public int CatsTotal { get; private set; }
+    public int CatsFound { get { return CatsTotal - remainingObjectCount; } }
+    public int CluesFound { get { return foundClues.Count; } }
+    public const int ClueCount = 5;
+
+    // 제한 시간이 있으면 남은 시간, 없으면 -1
+    public float TimeLeft
+    {
+        get { return Level != null && Level.timeLimit > 0f ? Mathf.Max(0f, Level.timeLimit - ElapsedTime - PenaltyTime) : -1f; }
+    }
+
+    private readonly List<HiddenCat> cats = new List<HiddenCat>();
+    private readonly HashSet<int> foundClues = new HashSet<int>();
+    private GameHUD hud;
+    private FirstPersonController player;
+    private bool pointerWasLocked;
+
     void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject); // 씬이 바뀌어도 파괴되지 않음
-        }
-        else
-        {
-            Destroy(gameObject); // 이미 인스턴스가 있으면 자신을 파괴
-            return;
-        }
-
-        // 씬이 로드될 때마다 OnSceneLoaded 함수를 실행하도록 등록합니다.
-        SceneManager.sceneLoaded += OnSceneLoaded;
-
-        // 초기 상태를 Starting으로 설정
-        ChangeState(GameState.Starting);
+        // 이전 버전은 DontDestroyOnLoad로 남아 있어서, 다시 플레이할 때 이전 씬의 패널을 참조하는 문제가 있었습니다.
+        // 이제는 씬마다 새 GameManager를 사용합니다.
+        Instance = this;
+        CurrentGameState = GameState.Starting;
+        Time.timeScale = 1f;
+        GameSession.ApplySettings();
     }
 
-    // 씬이 성공적으로 로드되었을 때 호출되는 함수입니다.
-    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    void Start()
     {
-        Debug.Log($"[GameManager] 씬 로드 완료: {scene.name}");
+        LevelDatabase db = LevelDatabase.Load();
+        LevelIndex = Mathf.Clamp(GameSession.SelectedLevel, 0, Mathf.Max(0, db.LevelCount - 1));
+        Level = db.GetLevel(LevelIndex);
+        HintsLeft = Level.hintCount;
 
-        // 새 씬이 로드되면 항상 'Playing' 상태로 시작하고 관련 로직을 실행합니다.
-        ChangeState(GameState.Playing);
+        player = FindObjectOfType<FirstPersonController>();
+        if (player != null) player.ApplySettings();
 
-        // 인스펙터에 설정된 위치에 오브젝트들을 생성합니다.
-        if (spawnPositionsFromInspector != null && spawnPositionsFromInspector.Length > 0)
-        {
-            // SpawnObjects 함수 내부에 이미 Playing 상태인지 확인하는 로직이 있습니다.
-            SpawnObjects(spawnPositionsFromInspector);
-        }
-        else
-        {
-            // 스폰 위치가 없을 경우 0으로 초기화 및 표시
-            remainingObjectCount = 0;
-        }
+        SpawnLevelCats(db);
+
+        hud = gameObject.AddComponent<GameHUD>();
+        hud.Build(this);
+
+        // 미션 안내 화면에서 '시작!'을 누르면 플레이 시작 (WebGL에서 마우스 잠금에 클릭이 필요하기도 합니다)
+        SetCursorFree(true);
+        hud.ShowBriefing();
     }
 
-    // GameManager 오브젝트가 파괴될 때(예: 게임 종료) 이벤트 구독을 해제합니다.
     void OnDestroy()
     {
-        // SceneManager에 등록했던 함수를 해제해야 메모리 누수가 발생하지 않습니다.
-        SceneManager.sceneLoaded -= OnSceneLoaded;
+        if (Instance == this) Instance = null;
     }
 
-    // N개의 GameObject를 지정된 위치 배열에 생성
-    // 외부 스크립트에서 Vector3 배열을 매개변수로 넘겨주면 그 위치에 생성
-    public void SpawnObjects(Vector3[] positions)
+    void Update()
     {
-        if (CurrentGameState != GameState.Playing)
+        if (CurrentGameState == GameState.Playing)
         {
-            Debug.LogWarning("[GameManager] 게임 플레이 중이 아닐 때는 오브젝트를 생성할 수 없습니다.");
-            return;
-        }
+            ElapsedTime += Time.deltaTime;
 
-        if (prefabToSpawn == null)
-        {
-            Debug.LogError("생성할 프리팹(PrefabToSpawn)이 GameManager Inspector에 할당되지 않았습니다!");
-            return;
-        }
-
-        remainingObjectCount = positions.Length;
-
-        foreach (Vector3 pos in positions)
-        {
-            float randomYRotation = Random.Range(0f, 360f);
-
-            Quaternion randomRotation = Quaternion.Euler(0, randomYRotation, 0);
-
-            GameObject newObject = Instantiate(prefabToSpawn, pos, randomRotation);
-            newObject.name = "ClickableObject_" + pos.ToString();
-
-            if (newObject.GetComponent<ClickableObject>() == null)
+            if (Level.timeLimit > 0f && TimeLeft <= 0f)
             {
-                newObject.AddComponent<ClickableObject>();
+                EndLevel(false);
+                return;
+            }
+
+            if (Input.GetKeyDown(KeyCode.H)) UseHint();
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)) Pause();
+
+            // WebGL에서는 ESC를 누르면 브라우저가 마우스 잠금을 먼저 풀어버리므로, 잠금이 풀린 것을 보고 일시정지합니다.
+            if (UIKit.IsWebGL)
+            {
+                if (Cursor.lockState == CursorLockMode.Locked) pointerWasLocked = true;
+                else if (pointerWasLocked) Pause();
             }
         }
+        else if (CurrentGameState == GameState.Paused)
+        {
+            if (Input.GetKeyDown(KeyCode.P)) Resume();
+        }
     }
+
+    void OnApplicationFocus(bool hasFocus)
+    {
+        // 브라우저 탭을 벗어나면 자동 일시정지
+        if (!hasFocus && CurrentGameState == GameState.Playing) Pause();
+    }
+
+    // ===== 레벨 준비 =====
+
+    void SpawnLevelCats(LevelDatabase db)
+    {
+        GameObject prefab = db.catPrefab != null ? db.catPrefab : prefabToSpawn;
+        if (prefab == null)
+        {
+            Debug.LogError("생성할 고양이 프리팹이 LevelDatabase 또는 GameManager Inspector에 할당되지 않았습니다!");
+            return;
+        }
+
+        Vector3 feet = player != null ? player.transform.position : Vector3.zero;
+        Vector3 eye = Camera.main != null ? Camera.main.transform.position : feet + Vector3.up * 1.6f;
+
+        int targetCount = Level.targets.Length;
+        int total = targetCount + Mathf.Max(0, Level.decoyCount);
+
+        List<Vector3> preferred = new List<Vector3>();
+        if (Level.fixedSpawnPositions != null) preferred.AddRange(Level.fixedSpawnPositions);
+        if (preferred.Count == 0 && LevelIndex == 0 && spawnPositionsFromInspector != null) preferred.AddRange(spawnPositionsFromInspector);
+
+        // 자동 탐색 중 플레이어 콜라이더가 방해하지 않도록 잠시 끕니다.
+        CharacterController cc = player != null ? player.GetComponent<CharacterController>() : null;
+        if (cc != null) cc.enabled = false;
+        List<CatSpawner.Spot> spots = CatSpawner.FindSpots(feet, eye, total, Level.hiddenRatio, preferred);
+        if (cc != null) cc.enabled = true;
+
+        // FindSpots는 지정 위치 → 숨겨진 자리 순으로 돌려주므로, 앞쪽은 진짜 고양이, 뒤쪽은 옆집 고양이가 차지합니다.
+        for (int i = 0; i < total && i < spots.Count; i++)
+        {
+            bool decoy = i >= targetCount;
+            Quaternion rotation = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+            GameObject go = Instantiate(prefab, spots[i].position, rotation);
+
+            if (go.GetComponent<ClickableObject>() == null) go.AddComponent<ClickableObject>();
+            HiddenCat cat = go.AddComponent<HiddenCat>();
+            if (decoy)
+            {
+                cat.Setup(db.decoyName, db.decoyTint, true, db.meowClip);
+                go.name = "DecoyCat_" + i;
+            }
+            else
+            {
+                CatTarget t = Level.targets[i];
+                cat.Setup(t.catName, t.tint, false, db.meowClip);
+                go.name = "Cat_" + t.catName;
+            }
+            cats.Add(cat);
+        }
+
+        CatsTotal = Mathf.Min(targetCount, spots.Count);
+        remainingObjectCount = CatsTotal;
+    }
+
+    // ===== 상태 전환 =====
+
+    public void BeginPlay()
+    {
+        if (CurrentGameState != GameState.Starting) return;
+        SetCursorFree(false);
+        ChangeState(GameState.Playing);
+    }
+
+    public void Pause()
+    {
+        if (CurrentGameState != GameState.Playing) return;
+        ChangeState(GameState.Paused);
+        SetCursorFree(true);
+        if (hud != null) hud.ShowPause();
+    }
+
+    public void Resume()
+    {
+        if (CurrentGameState != GameState.Paused) return;
+        if (hud != null) hud.HideOverlays();
+        SetCursorFree(false);
+        ChangeState(GameState.Playing);
+    }
+
+    void SetCursorFree(bool free)
+    {
+        pointerWasLocked = false;
+        Cursor.lockState = free ? CursorLockMode.None : CursorLockMode.Locked;
+        Cursor.visible = free;
+    }
+
+    // ===== 클릭 처리 =====
 
     public void OnObjectClicked(GameObject clickedObject)
     {
         if (CurrentGameState != GameState.Playing) return; // 플레이 중이 아니면 무시
 
-        Debug.Log($"[GameManager] 오브젝트 클릭됨: {clickedObject.name} (점수 획득!)");
+        HiddenCat cat = clickedObject.GetComponent<HiddenCat>();
+        if (cat == null)
+        {
+            // 레벨 고양이가 아닌 일반 클릭 오브젝트
+            Debug.Log($"[GameManager] 오브젝트 클릭됨: {clickedObject.name}");
+            Score += 10;
+            Destroy(clickedObject);
+            return;
+        }
+        if (cat.found) return;
 
-        //점수 획득
-        Score += 10;
+        if (cat.isDecoy)
+        {
+            WrongClicks++;
+            PenaltyTime += LevelDatabase.Load().decoyPenaltySeconds;
+            Score = Mathf.Max(0, Score - 5);
+            UIKit.PlayOneShot(LevelDatabase.Load().failClip, 0.8f);
+            cat.Meow();
+            cat.PlayRunAway();
+            cats.Remove(cat);
+            string penalty = Level.timeLimit > 0f ? $" -{LevelDatabase.Load().decoyPenaltySeconds:0}초" : "";
+            hud.Toast($"앗, {cat.catName}였어요!{penalty}", UIKit.Pink);
+            return;
+        }
 
-        // 남은 개수 차감
+        Debug.Log($"[GameManager] 고양이 찾음: {cat.catName}");
+        Score += 100;
         remainingObjectCount--;
         if (remainingObjectCount < 0) remainingObjectCount = 0; // 안전장치
-        Destroy(clickedObject); // 오브젝트 즉시 파괴
+        cats.Remove(cat);
+        cat.PlayFound();
+        UIKit.PlayOneShot(LevelDatabase.Load().successClip, 0.7f);
 
-        // 모든 오브젝트를 다 찾았을 때
         if (remainingObjectCount == 0)
         {
-            Debug.Log("모든 오브젝트를 찾았습니다!");
-            // 마지막 패널까지 본 뒤 게임 씬으로 이동
-            SceneManager.LoadScene("OutroScene");
+            Debug.Log("모든 고양이를 찾았습니다!");
+            hud.Toast($"{cat.catName} 찾았다!", UIKit.Green);
+            StartCoroutine(EndLevelAfter(1.0f, true));
+        }
+        else
+        {
+            hud.Toast($"{cat.catName} 찾았다! (남은 고양이 {remainingObjectCount})", UIKit.Green);
         }
     }
 
@@ -161,6 +289,12 @@ public class GameManager : MonoBehaviour
         if (CurrentGameState != GameState.Playing) return; // 플레이 중이 아니면 무시
 
         Debug.Log($"[GameManager] 오브젝트 클릭됨: {clickedObject.name}");
+
+        if (foundClues.Add(questIndex))
+        {
+            Score += 20;
+            GameSession.MarkClueFound(questIndex);
+        }
 
         GameObject targetQuestObject = null;
 
@@ -175,7 +309,8 @@ public class GameManager : MonoBehaviour
         {
             Debug.Log($"퀘스트 {questIndex + 1} 패널 활성화.");
 
-            // 퀘스트 패널 활성화 (애니메이터 스크립트의 OnEnable에서 등장 애니메이션 시작을 가정)
+            // 이미 열려 있는 패널을 다시 누른 경우 처음부터 다시 보여줍니다.
+            targetQuestObject.SetActive(false);
             targetQuestObject.SetActive(true);
 
             // 2초 지연 및 비활성화 코루틴 시작
@@ -194,11 +329,9 @@ public class GameManager : MonoBehaviour
         yield return new WaitForSeconds(delay);
 
         // 2. 부드러운 비활성화 애니메이션 시작 (QuestPanelAnimator 스크립트 호출)
-        // 🚨 이 부분이 '스르르 deactive'를 담당합니다.
-        if (questPanel.TryGetComponent<QuestPanelAnimator>(out var animator))
+        if (questPanel != null && questPanel.activeInHierarchy && questPanel.TryGetComponent<QuestPanelAnimator>(out var animator))
         {
             // 애니메이션이 끝날 때까지 기다립니다.
-            Debug.Log($"{questPanel.name} 비활성화 애니메이션 시작.");
             yield return animator.StartCloseAnimation();
         }
 
@@ -206,15 +339,122 @@ public class GameManager : MonoBehaviour
         if (questPanel != null)
         {
             questPanel.SetActive(false);
-            Debug.Log($"{questPanel.name} 비활성화 완료.");
         }
     }
+
+    // ===== 힌트 =====
+
+    public void UseHint()
+    {
+        if (CurrentGameState != GameState.Playing) return;
+        if (HintsLeft <= 0)
+        {
+            hud.Toast("힌트를 모두 사용했어요", UIKit.BrownLight);
+            return;
+        }
+
+        HiddenCat nearest = NearestTarget();
+        if (nearest == null) return;
+
+        HintsLeft--;
+        HintsUsed++;
+        nearest.Meow();
+        hud.ShowHintArrow(nearest.transform);
+    }
+
+    HiddenCat NearestTarget()
+    {
+        Vector3 from = player != null ? player.transform.position : Vector3.zero;
+        HiddenCat best = null;
+        float bestDistance = float.MaxValue;
+        foreach (HiddenCat c in cats)
+        {
+            if (c == null || c.isDecoy || c.found) continue;
+            float d = Vector3.Distance(from, c.transform.position);
+            if (d < bestDistance)
+            {
+                bestDistance = d;
+                best = c;
+            }
+        }
+        return best;
+    }
+
+    public Transform PlayerTransform
+    {
+        get { return Camera.main != null ? Camera.main.transform : (player != null ? player.transform : null); }
+    }
+
+    // ===== 레벨 종료 =====
+
+    IEnumerator EndLevelAfter(float delay, bool cleared)
+    {
+        // 클리어 순간 타이머를 멈춥니다.
+        ChangeState(GameState.GameOver);
+        Time.timeScale = 1f; // 고양이 애니메이션은 계속
+        yield return new WaitForSecondsRealtime(delay);
+        EndLevel(cleared);
+    }
+
+    void EndLevel(bool cleared)
+    {
+        ChangeState(GameState.GameOver);
+        SetCursorFree(true);
+
+        float time = ElapsedTime + PenaltyTime;
+        LevelResult result = new LevelResult
+        {
+            levelIndex = LevelIndex,
+            cleared = cleared,
+            time = time,
+            hintsUsed = HintsUsed,
+            wrongClicks = WrongClicks,
+            cluesFound = CluesFound,
+        };
+
+        if (cleared)
+        {
+            int stars = 3;
+            if (time > Level.parTime) stars--;
+            if (HintsUsed > 0 || WrongClicks > 0) stars--;
+            result.stars = Mathf.Max(1, stars);
+            Score += result.stars * 100 + (Level.timeLimit > 0f ? Mathf.RoundToInt(TimeLeft) * 2 : 0);
+            result.newBest = GameSession.SaveClear(LevelIndex, time, result.stars);
+        }
+        result.score = Score;
+        GameSession.LastResult = result;
+
+        hud.ShowResult(result);
+    }
+
+    public bool IsLastLevel
+    {
+        get { return LevelIndex >= LevelDatabase.Load().LevelCount - 1; }
+    }
+
+    public void PlayNextLevel()
+    {
+        GameSession.SelectedLevel = LevelIndex + 1;
+        LoadScene(SceneManager.GetActiveScene().name);
+    }
+
+    public void GoToLevelSelect()
+    {
+        GameSession.OpenLevelSelectOnIntro = true;
+        LoadScene("IntroScene");
+    }
+
+    public void GoToEnding()
+    {
+        LoadScene("OutroScene");
+    }
+
+    // ===== 기존 기능 =====
 
     public void SetCrosshairVisuals(bool isTargetingClickable)
     {
         if (targetVisualObject == null || defaultSprite == null || highlightedSprite == null)
         {
-            if (targetVisualObject == null) Debug.LogWarning("[GameManager] targetVisualObject가 할당되지 않았습니다. 크로스헤어 비주얼 업데이트 스킵.");
             return;
         }
 
@@ -253,35 +493,28 @@ public class GameManager : MonoBehaviour
                 break;
             case GameState.GameOver:
                 Time.timeScale = 0f;
-                Debug.Log("게임 오버! 최종 점수: " + score);
+                Debug.Log("게임 종료! 최종 점수: " + score);
                 break;
         }
     }
 
     public void TogglePause()
     {
-        if (CurrentGameState == GameState.Playing) ChangeState(GameState.Paused);
-        else if (CurrentGameState == GameState.Paused) ChangeState(GameState.Playing);
+        if (CurrentGameState == GameState.Playing) Pause();
+        else if (CurrentGameState == GameState.Paused) Resume();
     }
 
     public void LoadScene(string sceneName)
     {
         Debug.Log("[GameManager] 씬 로드: " + sceneName);
+        Time.timeScale = 1f;
         SceneManager.LoadScene(sceneName);
     }
 
     public void LoadNextLevel()
     {
-        int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
-        int nextSceneIndex = currentSceneIndex + 1;
-
-        if (nextSceneIndex >= SceneManager.sceneCountInBuildSettings)
-        {
-            nextSceneIndex = 0;
-        }
-
-        Debug.Log($"[GameManager] 다음 씬 로드 (Index: {nextSceneIndex})");
-        SceneManager.LoadScene(nextSceneIndex);
+        if (IsLastLevel) GoToEnding();
+        else PlayNextLevel();
     }
 
     public void RestartLevel()
