@@ -59,7 +59,7 @@ public class MenuUI : MonoBehaviour
         Button howTo = UIKit.Button(titleBar, "게임 방법", ShowHowToPlay, Color.white, 34);
         UIKit.ButtonLabel(howTo).color = UIKit.Brown;
         buttons.Add(howTo);
-        Button settings = UIKit.Button(titleBar, "설정", () => SettingsPanel.Build(screenRoot, null, null), Color.white, 34);
+        Button settings = UIKit.Button(titleBar, "설정", ShowSettings, Color.white, 34);
         UIKit.ButtonLabel(settings).color = UIKit.Brown;
         buttons.Add(settings);
 
@@ -83,7 +83,9 @@ public class MenuUI : MonoBehaviour
 
     public void ShowSettings()
     {
-        SettingsPanel.Build(screenRoot, null, null);
+        // 설정이 열려 있는 동안 뒤의 타이틀 메뉴는 숨기고, 닫히면 다시 보여줍니다 (ESC로 닫을 때는 CloseScreens가 처리).
+        SetTitleMenuVisible(false);
+        SettingsPanel.Build(screenRoot, () => SetTitleMenuVisible(true), null);
     }
 
     // 열려 있는 화면을 모두 닫고 타이틀로 돌아갑니다.
