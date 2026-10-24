@@ -91,6 +91,8 @@ public static class CatSpawner
             // 그 칸에 서거나 앉았을 때 눈높이에서 고양이가 보여야 합니다 (침대 깊숙한 밑처럼 가까이 가도 못 보는 자리 제외)
             Vector3 catEye = spot + Vector3.up * 0.15f;
             if (BlockedLine(cell + Vector3.up * 0.9f, catEye, mask) && BlockedLine(cell + Vector3.up * 1.5f, catEye, mask)) continue;
+            // 문 바로 옆은 제외: 열린 문짝 뒤에 숨으면 시선이 문에 막혀 "문 닫기"만 뜹니다
+            if (NearDoor(spot, mask)) continue;
 
             candidates.Add(new Spot { position = spot, hiddenFromStart = IsHidden(eye, spot, mask), cover = CoverScore(spot, mask) });
         }
@@ -295,8 +297,9 @@ public static class CatSpawner
                 if (hit.normal.y < 0.8f || Mathf.Abs(hit.point.y - feet.y) > 0.45f) continue;
 
                 // 사람이 설 수 있는 공간인지 (닫힌 문은 열고 지나갈 수 있으므로 장애물로 치지 않습니다)
+                // 플레이어 캡슐(반지름 0.38)에 맞춥니다. 좁게 잡으면 세탁기와 벽 사이 같은 틈이 '갈 수 있는 곳'이 되어 거기 숨은 고양이를 잡을 수 없습니다.
                 Vector3 floor = hit.point;
-                if (BlockedCapsule(floor + Vector3.up * 0.45f, floor + Vector3.up * 1.5f, 0.2f, mask)) continue;
+                if (BlockedCapsule(floor + Vector3.up * 0.6f, floor + Vector3.up * 1.3f, 0.36f, mask)) continue;
 
                 // 칸 사이에 벽이 있는지 (얇은 벽 통과 방지). 무릎 아래(0.3m)도 봐서 욕조 턱·침대처럼 낮은 가구를 넘어가지 않게 합니다 (캐릭터는 0.15m 턱까지만 오릅니다).
                 Vector3 a = curPos + Vector3.up * 0.6f;
@@ -326,6 +329,18 @@ public static class CatSpawner
         {
             if (lineHits[i].collider is CharacterController) continue;
             if (!DoorInteraction.IsPassable(lineHits[i].collider)) return true;
+        }
+        return false;
+    }
+
+    // 여닫이문·옷장 문·서랍 콜라이더가 0.9m 안에 있는지
+    static bool NearDoor(Vector3 spot, int mask)
+    {
+        int n = Physics.OverlapSphereNonAlloc(spot + Vector3.up * 0.3f, 0.9f, capsuleHits, mask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            if (capsuleHits[i] is CharacterController) continue;
+            if (DoorInteraction.IsPassable(capsuleHits[i])) return true;
         }
         return false;
     }

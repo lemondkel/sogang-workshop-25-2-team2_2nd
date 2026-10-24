@@ -267,9 +267,11 @@ public class HiddenCat : MonoBehaviour
 
         // 바닥(또는 선반)에 발을 맞춥니다. 발밑이 사라지면(가장자리) 멈춥니다.
         // 침대·탁자 밑(0.5m 아래)을 지날 수 있도록 0.2m 높이에서 아래로 쏩니다 (높이서 쏘면 가구 윗면에 맞아 멈춥니다).
+        // 문지방·러그 턱 위에서 레이가 콜라이더 안에서 시작하면 못 맞히므로, 실패하면 조금 더 위에서 다시 쏩니다.
         RaycastHit ground;
-        if (Physics.Raycast(next + Vector3.up * 0.2f, Vector3.down, out ground, 0.6f, mask, QueryTriggerInteraction.Ignore)
-            && Mathf.Abs(ground.point.y - transform.position.y) < 0.2f)
+        bool grounded = Physics.Raycast(next + Vector3.up * 0.2f, Vector3.down, out ground, 0.6f, mask, QueryTriggerInteraction.Ignore)
+                        || Physics.Raycast(next + Vector3.up * 0.45f, Vector3.down, out ground, 0.8f, mask, QueryTriggerInteraction.Ignore);
+        if (grounded && Mathf.Abs(ground.point.y - transform.position.y) < 0.2f)
         {
             next.y = ground.point.y;
         }
