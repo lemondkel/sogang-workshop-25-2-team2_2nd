@@ -25,21 +25,42 @@ public class IntroManager : MonoBehaviour
         titlePanel.SetActive(true);
         HideAllIntroPanels();
 
-        // 웹(WebGL)에서는 '나가기'가 동작하지 않으므로 숨깁니다.
-        if (UIKit.IsWebGL)
+        // 씬에 있던 그림 버튼(Start btn.png / Quit btn.png)은 쓰지 않고, MenuUI가 다른 메뉴와 같은 모양의 버튼을 만듭니다.
+        foreach (string name in new[] { "StartButton", "QuitButton" })
         {
-            Transform quit = titlePanel.transform.Find("QuitButton");
-            if (quit != null) quit.gameObject.SetActive(false);
+            Transform t = titlePanel.transform.Find(name);
+            if (t != null) t.gameObject.SetActive(false);
         }
 
         menu = gameObject.AddComponent<MenuUI>();
-        menu.Build(gameSceneName, ReplayStory);
+        menu.Build(gameSceneName, ReplayStory, OnClickStart, OnClickQuit);
 
         // 게임에서 '레벨 선택'으로 돌아온 경우 바로 레벨 선택 화면을 엽니다.
         if (GameSession.OpenLevelSelectOnIntro)
         {
             GameSession.OpenLevelSelectOnIntro = false;
             menu.ShowLevelSelect();
+        }
+    }
+
+    void Update()
+    {
+        bool escape = Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Backspace);
+        bool storyShowing = currentIndex >= 0 && !titlePanel.activeSelf;
+
+        if (storyShowing)
+        {
+            // 스토리는 클릭 외에 ESC·백스페이스·스페이스·엔터로도 넘어갑니다.
+            if (escape || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                OnClickNextIntroPanel();
+            }
+        }
+        else if (escape && menu != null && menu.IsScreenOpen)
+        {
+            // 앨범/게임 방법/설정/레벨 선택 화면은 ESC·백스페이스로 닫고 타이틀로 돌아갑니다.
+            UIKit.PlayClick();
+            menu.CloseScreens();
         }
     }
 
@@ -77,6 +98,7 @@ public class IntroManager : MonoBehaviour
         {
             // 마지막 패널까지 본 뒤 레벨 선택 화면으로 이동
             GameSession.StorySeen = true;
+            currentIndex = -1;
             HideAllIntroPanels();
             titlePanel.SetActive(true);
             menu.ShowLevelSelect();

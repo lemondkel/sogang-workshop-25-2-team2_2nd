@@ -16,12 +16,18 @@ public class MenuUI : MonoBehaviour
     private RectTransform titleBar;
     private RectTransform screenRoot;
     private Action onReplayStory;
+    private Action onStart, onQuit;
     private string gameSceneName;
 
-    public void Build(string gameScene, Action replayStory)
+    /// <summary>화면(앨범/게임 방법/설정/레벨 선택)이 하나라도 열려 있는지</summary>
+    public bool IsScreenOpen { get { return screenRoot != null && screenRoot.childCount > 0; } }
+
+    public void Build(string gameScene, Action replayStory, Action start, Action quit)
     {
         gameSceneName = gameScene;
         onReplayStory = replayStory;
+        onStart = start;
+        onQuit = quit;
 
         canvas = UIKit.CreateCanvas("MenuUI", 60);
         canvas.transform.SetParent(transform, false);
@@ -30,11 +36,12 @@ public class MenuUI : MonoBehaviour
         screenRoot = UIKit.Stretch(UIKit.Rect(canvas.transform, "Screens"));
     }
 
-    // 타이틀 화면에서만 보이는 메뉴.
-    // 씬의 시작/나가기 버튼이 화면 가운데 아래(y -300, -450)에 있으므로 겹치지 않게 오른쪽 아래 구석에 세로로 둡니다.
+    // 타이틀 화면에서만 보이는 메뉴. 오른쪽 아래 구석에 세로로 둡니다.
+    // 시작하기/끝내기도 그림 버튼 대신 여기서 같은 모양(흰 바탕, 갈색 글씨)으로 만듭니다. 시작하기만 주황색으로 강조합니다.
     void BuildTitleBar()
     {
-        titleBar = UIKit.Fixed(UIKit.Rect(canvas.transform, "TitleMenu"), new Vector2(1, 0), new Vector2(-40, 40), new Vector2(320, 276));
+        var buttons = new System.Collections.Generic.List<Button>();
+        titleBar = UIKit.Rect(canvas.transform, "TitleMenu");
         VerticalLayoutGroup v = titleBar.gameObject.AddComponent<VerticalLayoutGroup>();
         v.spacing = 18;
         v.childControlWidth = true;
@@ -42,14 +49,31 @@ public class MenuUI : MonoBehaviour
         v.childForceExpandWidth = true;
         v.childForceExpandHeight = true;
 
-        // 기존 시작/끝내기 버튼처럼 흰 바탕에 갈색 글씨
-        Button[] buttons =
+        Button start = UIKit.Button(titleBar, "시작하기", () => { if (onStart != null) onStart(); }, UIKit.Orange, 40);
+        UIKit.ButtonLabel(start).color = Color.white;
+        buttons.Add(start);
+
+        Button album = UIKit.Button(titleBar, "고양이 앨범", ShowAlbum, Color.white, 34);
+        UIKit.ButtonLabel(album).color = UIKit.Brown;
+        buttons.Add(album);
+        Button howTo = UIKit.Button(titleBar, "게임 방법", ShowHowToPlay, Color.white, 34);
+        UIKit.ButtonLabel(howTo).color = UIKit.Brown;
+        buttons.Add(howTo);
+        Button settings = UIKit.Button(titleBar, "설정", () => SettingsPanel.Build(screenRoot, null, null), Color.white, 34);
+        UIKit.ButtonLabel(settings).color = UIKit.Brown;
+        buttons.Add(settings);
+
+        // 웹(WebGL)에서는 '끝내기'가 동작하지 않으므로 만들지 않습니다.
+        if (!UIKit.IsWebGL)
         {
-            UIKit.Button(titleBar, "고양이 앨범", ShowAlbum, Color.white, 34),
-            UIKit.Button(titleBar, "게임 방법", ShowHowToPlay, Color.white, 34),
-            UIKit.Button(titleBar, "설정", () => SettingsPanel.Build(screenRoot, null, null), Color.white, 34),
-        };
-        foreach (Button b in buttons) UIKit.ButtonLabel(b).color = UIKit.Brown;
+            Button quit = UIKit.Button(titleBar, "끝내기", () => { if (onQuit != null) onQuit(); }, Color.white, 34);
+            UIKit.ButtonLabel(quit).color = UIKit.Brown;
+            buttons.Add(quit);
+        }
+
+        // 버튼 80px + 간격 18px
+        float height = buttons.Count * 80 + (buttons.Count - 1) * 18;
+        UIKit.Fixed(titleBar, new Vector2(1, 0), new Vector2(-40, 40), new Vector2(320, height));
     }
 
     public void SetTitleMenuVisible(bool visible)
