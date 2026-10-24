@@ -507,6 +507,9 @@ public class FirstPersonController : MonoBehaviour
     void LateUpdate()
     {
         if (cam == null) return;
+        // 순서가 중요합니다: 지난 프레임의 앉기 덮어쓰기를 먼저 되돌리고(애니메이터가 안 쓴 뼈), 그다음 Hips를 캡슐에 고정하고, 마지막에 앉기 포즈를 적용합니다.
+        // Hips 고정이 앉기 되돌리기보다 먼저 돌면 '애니메이터가 썼다'고 오판해 엉덩이 내림이 프레임마다 누적됩니다.
+        RestoreCrouchPose();
         PinHipsToCapsule();
         ApplyCrouchPose();
         if (viewMode == ViewMode.ThirdPerson) PlaceThirdPersonCamera();

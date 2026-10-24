@@ -83,7 +83,7 @@ public static class DoorInteraction
 
     public static void Toggle(MonoBehaviour door)
     {
-        if (door == null || !door.gameObject.activeInHierarchy) return;
+        if (door == null || !door.gameObject.activeInHierarchy || !IsDoorScript(door)) return; // 애니메이터 없는 문은 건너뜀
         door.StopAllCoroutines();
         door.StartCoroutine(IsOpen(door) ? "closing" : "opening");
     }
