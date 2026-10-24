@@ -101,6 +101,10 @@ public class GameManager : MonoBehaviour
         player = FindObjectOfType<FirstPersonController>();
         if (player != null) player.ApplySettings();
 
+        // 콜라이더가 없는 가구에 콜라이더를 붙인 뒤에 고양이를 숨겨야 가구 속에 숨지 않습니다.
+        int addedColliders = FurnitureColliders.EnsureColliders();
+        if (addedColliders > 0) Debug.Log("[FurnitureColliders] 콜라이더 없는 가구 " + addedColliders + "개에 BoxCollider 추가");
+
         SpawnLevelCats(db);
 
         hud = gameObject.AddComponent<GameHUD>();

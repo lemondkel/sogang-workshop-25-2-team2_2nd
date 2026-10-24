@@ -132,7 +132,9 @@ public class FirstPersonController : MonoBehaviour
         characterController.height = 1.75f;
         characterController.center = new Vector3(0, 0.9f, 0);
         characterController.radius = 0.3f;
-        characterController.stepOffset = 0.35f;
+        characterController.skinWidth = 0.03f; // 반지름의 10% 권장. 기본값 0.08은 벽에서 8cm 떨어져 멈추고 틈에 끼기 쉽습니다.
+        characterController.minMoveDistance = 0f;
+        characterController.stepOffset = 0.3f; // 낮은 가구(테이블·캣휠 받침)에 올라타지 않도록
 
         animator = GetComponentInChildren<Animator>();
         if (animator != null)
