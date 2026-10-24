@@ -56,8 +56,42 @@ public static class FurnitureColliders
             added++;
         }
 
+        added += FixMirroredBoxColliders();
+
         if (added > 0) Physics.SyncTransforms();
         return added;
+    }
+
+    /// <summary>
+    /// 좌우 반전(음수 스케일)된 오브젝트에 붙은 BoxCollider는 Unity가 매 프레임 경고를 내고 충돌도 틀어집니다
+    /// (예: 주방 수납장의 거울상 서랍). 스케일을 되돌린 자식 오브젝트에 같은 크기의 상자를 다시 만듭니다.
+    /// </summary>
+    static int FixMirroredBoxColliders()
+    {
+        int fixedCount = 0;
+        foreach (BoxCollider box in Object.FindObjectsOfType<BoxCollider>())
+        {
+            Vector3 ls = box.transform.lossyScale;
+            if (ls.x >= 0f && ls.y >= 0f && ls.z >= 0f) continue;
+            if (box.GetComponentInParent<FirstPersonController>() != null) continue;
+
+            Vector3 flip = new Vector3(Mathf.Sign(ls.x), Mathf.Sign(ls.y), Mathf.Sign(ls.z));
+            GameObject holder = new GameObject(box.name + " (collider)");
+            holder.layer = box.gameObject.layer;
+            holder.transform.SetParent(box.transform, false);
+            holder.transform.localPosition = Vector3.zero;
+            holder.transform.localRotation = Quaternion.identity;
+            holder.transform.localScale = flip; // 부모의 음수 스케일을 상쇄
+
+            BoxCollider copy = holder.AddComponent<BoxCollider>();
+            copy.center = Vector3.Scale(box.center, flip);
+            copy.size = box.size;
+            copy.isTrigger = box.isTrigger;
+            copy.sharedMaterial = box.sharedMaterial;
+            Object.Destroy(box);
+            fixedCount++;
+        }
+        return fixedCount;
     }
 
     static bool IsExterior(Transform t)

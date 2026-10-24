@@ -63,11 +63,11 @@ public static class DoorInteraction
     {
         string n = door.GetType().Name;
         bool open = IsOpen(door);
-        if (n.IndexOf("Flip", System.StringComparison.OrdinalIgnoreCase) >= 0) return open ? "접기" : "펼치기";
         string what = "문";
         if (n.StartsWith("Drawer")) what = "서랍";
         else if (n.IndexOf("Window", System.StringComparison.OrdinalIgnoreCase) >= 0) what = "창문";
         else if (n.IndexOf("Oven", System.StringComparison.OrdinalIgnoreCase) >= 0) what = "오븐";
+        else if (n.IndexOf("Flip", System.StringComparison.OrdinalIgnoreCase) >= 0) return open ? "접기" : "펼치기"; // 접이식 테이블
         return what + (open ? " 닫기" : " 열기");
     }
 

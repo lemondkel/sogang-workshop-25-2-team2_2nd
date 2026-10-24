@@ -118,6 +118,7 @@ public static class CatSpawner
         Collider body = cat.GetComponentInChildren<Collider>();
         if (body == null) return;
         int mask = EnvironmentMask;
+        Vector3 original = cat.transform.position;
         Collider[] near = new Collider[16];
         for (int iter = 0; iter < 4; iter++)
         {
@@ -136,6 +137,22 @@ public static class CatSpawner
                 moved = true;
             }
             if (!moved) break;
+        }
+
+        // 밀려난 자리가 선반/탁자 가장자리를 벗어났으면 바닥에 다시 맞추고, 아래에 아무것도 없으면 원래 자리로 돌립니다.
+        if (cat.transform.position != original)
+        {
+            RaycastHit ground;
+            if (Physics.Raycast(cat.transform.position + Vector3.up * 0.3f, Vector3.down, out ground, 1.5f, mask, QueryTriggerInteraction.Ignore))
+            {
+                Vector3 p = cat.transform.position;
+                p.y = ground.point.y;
+                cat.transform.position = p;
+            }
+            else
+            {
+                cat.transform.position = original;
+            }
         }
     }
 
