@@ -99,11 +99,18 @@ public static class DoorInteraction
         else if (n.IndexOf("Oven", System.StringComparison.OrdinalIgnoreCase) >= 0) what = "오븐";
         else if (n.IndexOf("Flip", System.StringComparison.OrdinalIgnoreCase) >= 0)
         {
-            // 접이식 테이블/벤치는 '펼치기', 뚜껑이 달린 빨래통 같은 것은 '열기'
-            string obj = door.name;
-            bool table = obj.IndexOf("Table", System.StringComparison.OrdinalIgnoreCase) >= 0 || obj.IndexOf("Bench", System.StringComparison.OrdinalIgnoreCase) >= 0
-                         || n.IndexOf("Table", System.StringComparison.OrdinalIgnoreCase) >= 0;
-            if (table) return open ? "접기" : "펼치기";
+            // 접이식 테이블/벤치는 '펼치기', 뚜껑이 달린 빨래통·상자 같은 것은 '뚜껑 열기' (오브젝트와 부모 이름으로 구분)
+            bool lid = false;
+            int depth = 0;
+            for (Transform t = door.transform; t != null && depth < 4; t = t.parent, depth++)
+            {
+                string on = t.name;
+                if (on.IndexOf("Hamper", System.StringComparison.OrdinalIgnoreCase) >= 0 || on.IndexOf("Flap", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    || on.IndexOf("Lid", System.StringComparison.OrdinalIgnoreCase) >= 0 || on.IndexOf("Trash", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    || on.IndexOf("Bin", System.StringComparison.OrdinalIgnoreCase) >= 0 || on.IndexOf("Box", System.StringComparison.OrdinalIgnoreCase) >= 0
+                    || on.IndexOf("Basket", System.StringComparison.OrdinalIgnoreCase) >= 0) { lid = true; break; }
+            }
+            if (!lid) return open ? "접기" : "펼치기";
             what = "뚜껑";
         }
         return what + (open ? " 닫기" : " 열기");

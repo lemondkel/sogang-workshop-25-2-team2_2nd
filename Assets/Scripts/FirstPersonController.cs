@@ -91,6 +91,8 @@ public class FirstPersonController : MonoBehaviour
     private Vector3 hipsIdleLocal; // 캐릭터 루트 기준
     private bool hipsIdleCached;
     private Vector3 standoffPushSmoothed;
+    private readonly Vector3[] standoffNormals = new Vector3[16];
+    private int standoffNormalCount;
 
     // 1인칭 손 위치 (카메라 기준). 오른손은 간식을 든 것처럼 조금 더 앞에.
     // 팔이 쭉 펴진 '좀비 자세'가 되지 않도록 조금 가깝고 낮게 (화면 아래쪽 1/3에 보입니다)
@@ -407,14 +409,24 @@ public class FirstPersonController : MonoBehaviour
         Vector3 l2 = transform.position + Vector3.up * Mathf.Max(0.75f, step + 0.08f + rLow);
 
         Vector3 push = Vector3.zero;
+        standoffNormalCount = 0;
         for (int i = 0; i < dirs.Length; i++)
         {
             Standoff(h1, h2, rHigh, r, skin, dirs[i], mask, ref move, ref push);
             Standoff(l1, l2, rLow, r, skin, dirs[i], mask, ref move, ref push);
         }
 
-        // 두 면 사이(문짝과 기둥 사이 등)에서 프레임마다 다른 면이 잡혀 좌우로 떨리지 않도록 밀어내는 힘을 부드럽게 섞습니다.
+        // 두 면 사이에 끼었을 때(서로 마주 보는 면이 둘 다 가까움: 옷장 문과 기둥 사이 등)는 밀어내지 않고 막기만 합니다.
+        // 양쪽에서 번갈아 밀면 좌우로 떨립니다.
+        bool pinched = false;
+        for (int a = 0; a < standoffNormalCount && !pinched; a++)
+            for (int b = a + 1; b < standoffNormalCount; b++)
+                if (Vector3.Dot(standoffNormals[a], standoffNormals[b]) < -0.2f) { pinched = true; break; }
+        if (pinched) push = Vector3.zero;
+
+        // 프레임마다 다른 면이 잡혀 떨리지 않도록 밀어내는 힘을 부드럽게 섞습니다.
         standoffPushSmoothed = Vector3.Lerp(standoffPushSmoothed, push, 1f - Mathf.Exp(-12f * Time.deltaTime));
+        if (standoffPushSmoothed.sqrMagnitude < 0.0004f) standoffPushSmoothed = Vector3.zero; // 2cm 미만은 무시
         if (standoffPushSmoothed.sqrMagnitude > 1e-6f)
         {
             move += Vector3.ClampMagnitude(standoffPushSmoothed * 6f, 0.4f);
@@ -440,7 +452,11 @@ public class FirstPersonController : MonoBehaviour
 
         // 너무 가까우면 표면 반대쪽으로 조금 밀려납니다
         float deficit = reach - hit.distance;
-        if (deficit > 0f) push += n * deficit;
+        if (deficit > 0f)
+        {
+            push += n * deficit;
+            if (standoffNormalCount < standoffNormals.Length) standoffNormals[standoffNormalCount++] = n;
+        }
     }
 
     void UpdateInteraction()
