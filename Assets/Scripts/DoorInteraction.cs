@@ -16,15 +16,35 @@ public static class DoorInteraction
     {
         door = null;
         if (collider == null) return false;
+        MonoBehaviour fallback = null;
         int depth = 0;
         for (Transform t = collider.transform; t != null && depth < 4; t = t.parent, depth++)
         {
             foreach (MonoBehaviour mb in t.GetComponents<MonoBehaviour>())
             {
-                if (mb != null && IsDoorScript(mb)) { door = mb; return true; }
+                if (mb == null || !IsDoorScript(mb)) continue;
+                // 한 오브젝트에 문 스크립트가 둘 붙어 있고 하나는 다른 문의 애니메이터를 가리키는 경우가 있어서(씬 데이터 실수),
+                // 애니메이터가 이 문 자신(또는 자식/부모)에 있는 스크립트를 우선합니다.
+                Animator anim = GetAnimator(mb);
+                if (anim != null && (anim.transform == collider.transform || collider.transform.IsChildOf(anim.transform) || anim.transform.IsChildOf(t)))
+                {
+                    door = mb;
+                    return true;
+                }
+                if (fallback == null) fallback = mb;
             }
         }
-        return false;
+        door = fallback;
+        return door != null;
+    }
+
+    static Animator GetAnimator(MonoBehaviour mb)
+    {
+        foreach (FieldInfo f in mb.GetType().GetFields(Flags))
+        {
+            if (f.FieldType == typeof(Animator)) return (Animator)f.GetValue(mb);
+        }
+        return null;
     }
 
     public static bool IsDoor(Collider collider)
@@ -77,7 +97,15 @@ public static class DoorInteraction
         if (n.StartsWith("Drawer")) what = "서랍";
         else if (n.IndexOf("Window", System.StringComparison.OrdinalIgnoreCase) >= 0) what = "창문";
         else if (n.IndexOf("Oven", System.StringComparison.OrdinalIgnoreCase) >= 0) what = "오븐";
-        else if (n.IndexOf("Flip", System.StringComparison.OrdinalIgnoreCase) >= 0) return open ? "접기" : "펼치기"; // 접이식 테이블
+        else if (n.IndexOf("Flip", System.StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            // 접이식 테이블/벤치는 '펼치기', 뚜껑이 달린 빨래통 같은 것은 '열기'
+            string obj = door.name;
+            bool table = obj.IndexOf("Table", System.StringComparison.OrdinalIgnoreCase) >= 0 || obj.IndexOf("Bench", System.StringComparison.OrdinalIgnoreCase) >= 0
+                         || n.IndexOf("Table", System.StringComparison.OrdinalIgnoreCase) >= 0;
+            if (table) return open ? "접기" : "펼치기";
+            what = "뚜껑";
+        }
         return what + (open ? " 닫기" : " 열기");
     }
 
@@ -94,8 +122,20 @@ public static class DoorInteraction
         int count = 0;
         foreach (MonoBehaviour mb in Object.FindObjectsOfType<MonoBehaviour>(true))
         {
-            if (mb == null || !IsDoorScript(mb)) continue;
-            FieldInfo player = mb.GetType().GetField("Player", Flags);
+            if (mb == null) continue;
+            System.Type type = mb.GetType();
+            if (type.GetField("open", Flags) == null || type.GetMethod("opening", Flags) == null) continue;
+
+            // 애니메이터 연결이 빠진 문(씬 데이터 실수)은 같은 오브젝트의 애니메이터를 넣어 줍니다.
+            foreach (FieldInfo f in type.GetFields(Flags))
+            {
+                if (f.FieldType != typeof(Animator) || f.GetValue(mb) != null) continue;
+                Animator own = mb.GetComponent<Animator>();
+                if (own == null) own = mb.GetComponentInChildren<Animator>();
+                if (own != null) f.SetValue(mb, own);
+            }
+
+            FieldInfo player = type.GetField("Player", Flags);
             if (player != null && player.FieldType == typeof(Transform)) player.SetValue(mb, null);
             count++;
         }

@@ -530,10 +530,11 @@ public class FirstPersonController : MonoBehaviour
     {
         if (!hipsIdleCached || hips == null) return;
         Vector3 local = transform.InverseTransformPoint(hips.position);
-        if (Mathf.Abs(local.x - hipsIdleLocal.x) < 0.001f && Mathf.Abs(local.z - hipsIdleLocal.z) < 0.001f) return;
-        local.x = hipsIdleLocal.x;
-        local.z = hipsIdleLocal.z;
-        hips.position = transform.TransformPoint(local);
+        // 높이는 걷기 들썩임(몇 cm)만 허용합니다. 클립/전환에 따라 엉덩이 높이가 조금씩 내려가 하체가 바닥에 파묻히는 것을 막습니다.
+        float bob = Mathf.Clamp(local.y - hipsIdleLocal.y, -0.05f, 0.05f);
+        Vector3 pinned = new Vector3(hipsIdleLocal.x, hipsIdleLocal.y + bob, hipsIdleLocal.z);
+        if ((local - pinned).sqrMagnitude < 1e-8f) return;
+        hips.position = transform.TransformPoint(pinned);
     }
 
     /// <summary>
