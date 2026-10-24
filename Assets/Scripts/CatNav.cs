@@ -8,9 +8,10 @@ using UnityEngine;
 public static class CatNav
 {
     const float CellSize = 0.5f;
-    // 고양이 몸 크기의 상자(바닥 위 0.04~0.42m, 좌우 ±0.2m)로 캐스트합니다. 콜라이더(반지름 0.22m)와 거의 같아서 다리·가구 밑면에 걸치지 않습니다.
-    static readonly Vector3 CatHalf = new Vector3(0.2f, 0.19f, 0.2f);
-    const float CatCenterHeight = 0.23f;
+    // 고양이 몸 크기의 상자(바닥 위 0.10~0.42m, 좌우 ±0.2m)로 캐스트합니다. 콜라이더(반지름 0.22m)와 거의 같아서 다리·가구 밑면에 걸치지 않습니다.
+    // 바닥에서 10cm는 비워 둬서 문지방·러그 같은 낮은 턱에는 막히지 않습니다 (발은 턱을 밟고 올라갑니다).
+    static readonly Vector3 CatHalf = new Vector3(0.2f, 0.16f, 0.2f);
+    const float CatCenterHeight = 0.26f;
 
     static List<Vector3> cells;
     static Dictionary<Vector2Int, int> index;
@@ -40,7 +41,8 @@ public static class CatNav
                 if (dx == 0 && dz == 0) continue;
                 int j;
                 if (!index.TryGetValue(new Vector2Int(k.x + dx, k.y + dz), out j) || j <= i) continue;
-                if (!Clear(cells[i], cells[j])) continue;
+                // 양방향 모두 비어 있어야 이어진 것으로 칩니다 (문지방처럼 높이가 다른 칸은 한쪽에서만 막힐 수 있습니다)
+                if (!Clear(cells[i], cells[j]) || !Clear(cells[j], cells[i])) continue;
                 adjacency[i].Add(j);
                 adjacency[j].Add(i);
             }
