@@ -44,6 +44,10 @@ public static class FurnitureColliders
             // 머리 위(천장 조명 등)는 부딪힐 일이 없습니다.
             if (renderer.bounds.min.y > 2.0f) continue;
 
+            // 좌우 반전(음수 스케일)된 오브젝트는 BoxCollider가 경고를 내므로 건너뜁니다.
+            Vector3 ls = renderer.transform.lossyScale;
+            if (ls.x < 0f || ls.y < 0f || ls.z < 0f) continue;
+
             Bounds local = filter.sharedMesh.bounds;
             BoxCollider box = renderer.gameObject.AddComponent<BoxCollider>();
             box.center = local.center;

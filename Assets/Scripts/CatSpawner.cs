@@ -180,7 +180,8 @@ public static class CatSpawner
         // 고양이가 들어갈 공간이 있는지 (몸통 구: 반지름 0.3, 중심 높이 0.2 → 여유를 두고 0.36)
         Vector3 center = hit.point + Vector3.up * 0.4f;
         if (Physics.CheckBox(center, new Vector3(0.28f, 0.25f, 0.28f), Quaternion.identity, mask, QueryTriggerInteraction.Ignore)) return false;
-        if (Physics.CheckSphere(hit.point + Vector3.up * 0.22f, 0.36f, mask, QueryTriggerInteraction.Ignore)) return false;
+        // 바닥에 닿지 않도록 바닥에서 8cm 띄운 캡슐(높이 0.08~0.78)로 옆 여유만 봅니다.
+        if (Physics.CheckCapsule(hit.point + Vector3.up * 0.42f, hit.point + Vector3.up * 0.44f, 0.34f, mask, QueryTriggerInteraction.Ignore)) return false;
 
         // 실내인지 (위에 천장이 있어야 함)
         if (!Physics.Raycast(hit.point + Vector3.up * 0.2f, Vector3.up, 6f, mask, QueryTriggerInteraction.Ignore)) return false;
@@ -258,7 +259,7 @@ public static class CatSpawner
         for (int i = 0; i < n; i++)
         {
             if (lineHits[i].collider is CharacterController) continue;
-            if (!DoorInteraction.IsDoor(lineHits[i].collider)) return true;
+            if (!DoorInteraction.IsPassable(lineHits[i].collider)) return true;
         }
         return false;
     }
@@ -269,7 +270,7 @@ public static class CatSpawner
         for (int i = 0; i < n; i++)
         {
             if (capsuleHits[i] is CharacterController) continue;
-            if (!DoorInteraction.IsDoor(capsuleHits[i])) return true;
+            if (!DoorInteraction.IsPassable(capsuleHits[i])) return true;
         }
         return false;
     }

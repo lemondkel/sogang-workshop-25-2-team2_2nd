@@ -33,6 +33,17 @@ public static class DoorInteraction
         return TryGet(collider, out d);
     }
 
+    /// <summary>플레이어가 열고 지나갈 수 있는 것(문·옷장·미닫이). 창문·오븐·접이식 테이블은 아닙니다.</summary>
+    public static bool IsPassable(Collider collider)
+    {
+        MonoBehaviour d;
+        if (!TryGet(collider, out d)) return false;
+        string n = d.GetType().Name;
+        return n.IndexOf("Window", System.StringComparison.OrdinalIgnoreCase) < 0
+            && n.IndexOf("Oven", System.StringComparison.OrdinalIgnoreCase) < 0
+            && n.IndexOf("Flip", System.StringComparison.OrdinalIgnoreCase) < 0;
+    }
+
     static bool IsDoorScript(MonoBehaviour mb)
     {
         System.Type type = mb.GetType();
@@ -50,9 +61,14 @@ public static class DoorInteraction
 
     public static string Label(MonoBehaviour door)
     {
-        bool drawer = door.GetType().Name.StartsWith("Drawer");
-        string what = drawer ? "서랍" : "문";
-        return what + (IsOpen(door) ? " 닫기" : " 열기");
+        string n = door.GetType().Name;
+        bool open = IsOpen(door);
+        if (n.IndexOf("Flip", System.StringComparison.OrdinalIgnoreCase) >= 0) return open ? "접기" : "펼치기";
+        string what = "문";
+        if (n.StartsWith("Drawer")) what = "서랍";
+        else if (n.IndexOf("Window", System.StringComparison.OrdinalIgnoreCase) >= 0) what = "창문";
+        else if (n.IndexOf("Oven", System.StringComparison.OrdinalIgnoreCase) >= 0) what = "오븐";
+        return what + (open ? " 닫기" : " 열기");
     }
 
     public static void Toggle(MonoBehaviour door)
