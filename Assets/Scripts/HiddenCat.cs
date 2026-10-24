@@ -145,6 +145,22 @@ public class HiddenCat : MonoBehaviour
 
     struct Candidate { public Vector3 position; public float score; }
     private static readonly List<Candidate> candidates = new List<Candidate>();
+    private static readonly List<HiddenCat> all = new List<HiddenCat>();
+
+    void OnEnable() { all.Add(this); }
+    void OnDisable() { all.Remove(this); }
+
+    /// <summary>다른 고양이가 있거나 가고 있는 자리인지 (여러 마리가 한 자리로 몰리지 않게).</summary>
+    bool TakenByOther(Vector3 p)
+    {
+        foreach (HiddenCat c in all)
+        {
+            if (c == this || c == null) continue;
+            if (Flat(c.transform.position - p).magnitude < 1.2f) return true;
+            if ((c.mode == Mode.Walk || c.mode == Mode.Flee) && c.path.Count > 0 && Flat(c.path[c.path.Count - 1] - p).magnitude < 1.2f) return true;
+        }
+        return false;
+    }
 
     bool TryWander()
     {
@@ -158,6 +174,7 @@ public class HiddenCat : MonoBehaviour
             float d = Flat(p - here).magnitude;
             if (d < 1.5f || d > SpotRadius) continue;
             if (player != null && Flat(p - player.position).magnitude < 3.0f) continue; // 플레이어 쪽으로는 가지 않습니다
+            if (TakenByOther(p)) continue;
             candidates.Add(new Candidate { position = p, score = Random.value * 2f + s.cover * 0.3f });
         }
         return StartMoveToBest(Mode.Walk);
@@ -176,6 +193,7 @@ public class HiddenCat : MonoBehaviour
             if (d < 1.5f || d > SpotRadius) continue;
             float fromPlayer = player != null ? Flat(p - player.position).magnitude : 10f;
             if (fromPlayer < 3.5f) continue;
+            if (TakenByOther(p)) continue;
             // 플레이어에게서 멀어지는 방향, 너무 멀지 않은 자리, 잘 가려진 자리를 좋아합니다
             candidates.Add(new Candidate { position = p, score = fromPlayer - d * 0.4f + s.cover * 0.4f + Random.value });
         }
@@ -239,9 +257,10 @@ public class HiddenCat : MonoBehaviour
         Vector3 next = transform.position + dir * step;
 
         // 바닥(또는 선반)에 발을 맞춥니다. 발밑이 사라지면(가장자리) 멈춥니다.
+        // 침대·탁자 밑(0.5m 아래)을 지날 수 있도록 0.2m 높이에서 아래로 쏩니다 (높이서 쏘면 가구 윗면에 맞아 멈춥니다).
         RaycastHit ground;
-        if (Physics.Raycast(next + Vector3.up * 0.5f, Vector3.down, out ground, 1.0f, mask, QueryTriggerInteraction.Ignore)
-            && Mathf.Abs(ground.point.y - transform.position.y) < 0.25f)
+        if (Physics.Raycast(next + Vector3.up * 0.2f, Vector3.down, out ground, 0.6f, mask, QueryTriggerInteraction.Ignore)
+            && Mathf.Abs(ground.point.y - transform.position.y) < 0.2f)
         {
             next.y = ground.point.y;
         }

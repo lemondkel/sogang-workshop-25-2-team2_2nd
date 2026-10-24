@@ -110,7 +110,9 @@ public class FirstPersonController : MonoBehaviour
     private const float HugReachEnd = 0.45f; // 손을 뻗는 시간
     private const float HugLiftEnd = 1.0f;   // 고양이가 품에 들어오는 시간
     private const float HugDuration = 2.8f;  // 전체 길이
-    private float hugOrbitAngle = 70f;       // 안아줄 때 카메라가 도는 방향 (벽이 없는 쪽을 고릅니다)
+    private const float HugPitch = 22f;      // 안아줄 때 카메라가 내려다보는 각도
+    private float hugOrbitAngle = 110f;      // 안아줄 때 카메라가 도는 방향: 몸이 향한 방향 기준 (벽이 없는 쪽을 고릅니다)
+    private float hugFacingYaw;              // 안아줄 때 몸이 향하는 방향(고양이 쪽)
     public bool IsHugging { get { return hugCat != null; } }
     public bool IsCrouching { get { return isCrouching || crouchBlend > 0.5f; } }
 
@@ -300,6 +302,9 @@ public class FirstPersonController : MonoBehaviour
             if (GameManager.Instance.Hud != null) GameManager.Instance.Hud.SetInteractPrompt(null);
             GameManager.Instance.SetCrosshairVisuals(false);
         }
+        Vector3 toCat = hugStartPos - transform.position;
+        toCat.y = 0f;
+        hugFacingYaw = toCat.sqrMagnitude > 0.0001f ? Mathf.Atan2(toCat.x, toCat.z) * Mathf.Rad2Deg : transform.eulerAngles.y;
         hugOrbitAngle = PickHugOrbit();
         return HugDuration;
     }
@@ -310,14 +315,15 @@ public class FirstPersonController : MonoBehaviour
     /// </summary>
     float PickHugOrbit()
     {
-        float[] angles = { 70f, -70f, 100f, -100f, 45f, -45f, 130f, -130f, 0f };
+        // 카메라 회전 = 몸 방향 + a. 카메라 위치는 그 반대쪽이므로 a=180이면 정면, ±110이면 앞쪽 비스듬히, 0이면 등 뒤입니다.
+        float[] angles = { 110f, -110f, 135f, -135f, 80f, -80f, 160f, -160f, 180f, 0f };
         Vector3 center = transform.position + Vector3.up * Mathf.Lerp(cameraHeight, cameraHeight - crouchHipsDrop, crouchBlend);
         int mask = EnvironmentMask;
         float bestClear = -1f;
         float best = 0f;
         foreach (float a in angles)
         {
-            Vector3 dir = Quaternion.Euler(18f, yaw + a, 0) * Vector3.back;
+            Vector3 dir = Quaternion.Euler(HugPitch, hugFacingYaw + a, 0) * Vector3.back;
             RaycastHit hit;
             float clear = Physics.SphereCast(center, cameraRadius, dir, out hit, 1.45f, mask, QueryTriggerInteraction.Ignore) ? hit.distance : 1.45f;
             if (clear >= 1.2f) return a;          // 충분히 트였으면 앞선 순서(앞쪽 우선)대로
@@ -812,7 +818,8 @@ public class FirstPersonController : MonoBehaviour
     {
         // 안아줄 때는 카메라가 캐릭터 오른쪽 앞으로 돌아 들어와 품에 안긴 고양이가 보이게 합니다 (뒤에서는 몸에 가립니다)
         float orbit = Mathf.SmoothStep(0f, 1f, hugZoom);
-        Quaternion rotation = Quaternion.Euler(Mathf.Lerp(pitch, 18f, orbit), yaw + hugOrbitAngle * orbit, 0);
+        float camYaw = orbit > 0f ? Mathf.LerpAngle(yaw, hugFacingYaw + hugOrbitAngle, orbit) : yaw;
+        Quaternion rotation = Quaternion.Euler(Mathf.Lerp(pitch, HugPitch, orbit), camYaw, 0);
         int mask = EnvironmentMask;
         RaycastHit hit;
 

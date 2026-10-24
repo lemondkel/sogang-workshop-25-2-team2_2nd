@@ -295,11 +295,13 @@ public static class CatSpawner
                 Vector3 floor = hit.point;
                 if (BlockedCapsule(floor + Vector3.up * 0.45f, floor + Vector3.up * 1.5f, 0.2f, mask)) continue;
 
-                // 칸 사이에 벽이 있는지 (얇은 벽 통과 방지)
+                // 칸 사이에 벽이 있는지 (얇은 벽 통과 방지). 무릎 아래(0.3m)도 봐서 욕조 턱·침대처럼 낮은 가구를 넘어가지 않게 합니다 (캐릭터는 0.15m 턱까지만 오릅니다).
                 Vector3 a = curPos + Vector3.up * 0.6f;
                 Vector3 b = floor + Vector3.up * 0.6f;
                 if (BlockedLine(a, b, mask)) continue;
                 if (BlockedLine(a + Vector3.up * 0.7f, b + Vector3.up * 0.7f, mask)) continue;
+                if (BlockedLine(curPos + Vector3.up * 0.3f, floor + Vector3.up * 0.3f, mask)) continue;
+                if (Mathf.Abs(floor.y - curPos.y) > 0.2f) continue;
 
                 visited[next] = floor;
                 queue.Enqueue(next);
