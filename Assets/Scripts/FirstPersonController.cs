@@ -60,6 +60,8 @@ public class FirstPersonController : MonoBehaviour
     public float raycastHitDistance = 3f;
     [Tooltip("캐릭터 몸에서 손이 닿는 거리 (3인칭)")]
     public float reachDistance = 2.8f;
+    [Tooltip("벽·문 앞에서 캡슐이 닿기 전에 멈추는 여유 거리 (팔·얼굴이 벽에 파묻히지 않게)")]
+    public float wallStandoff = 0.18f;
     [Tooltip("클릭 가능한 오브젝트가 위치한 Layer Mask입니다. (ClickableObject 스크립트가 붙은 오브젝트만 확인)")]
     public LayerMask clickableLayerMask; // Inspector에서 설정해야 합니다.
 
@@ -326,7 +328,29 @@ public class FirstPersonController : MonoBehaviour
             verticalVelocity -= gravity * Time.deltaTime;
         }
 
-        characterController.Move((planarVelocity + Vector3.up * verticalVelocity) * Time.deltaTime);
+        // 벽·문 앞에서는 캡슐이 닿기 전에 미리 멈춥니다. 캡슐은 몸 중심 기준이라 걷는 팔·얼굴은 캡슐 밖으로 나오는데,
+        // 캡슐이 벽에 딱 붙으면 그 부분이 벽에 파묻혀 보입니다. (턱 높이 위부터 검사해서 낮은 문턱은 그대로 넘습니다)
+        Vector3 move = planarVelocity;
+        if (move.sqrMagnitude > 1e-4f)
+        {
+            float r = characterController.radius;
+            Vector3 p1 = transform.position + Vector3.up * (characterController.stepOffset + r + 0.02f);
+            Vector3 p2 = transform.position + Vector3.up * Mathf.Max(characterController.height - r, characterController.stepOffset + r + 0.03f);
+            RaycastHit wall;
+            if (Physics.CapsuleCast(p1, p2, r, move.normalized, out wall, wallStandoff + characterController.skinWidth, EnvironmentMask, QueryTriggerInteraction.Ignore))
+            {
+                Vector3 n = wall.normal;
+                n.y = 0f;
+                if (n.sqrMagnitude > 0.01f)
+                {
+                    n.Normalize();
+                    float into = Vector3.Dot(move, n);
+                    if (into < 0f) move -= n * into; // 벽 쪽 성분만 빼고 벽을 따라 미끄러집니다
+                }
+            }
+        }
+
+        characterController.Move((move + Vector3.up * verticalVelocity) * Time.deltaTime);
 
         // 캐릭터 몸 방향
         if (viewMode == ViewMode.ThirdPerson)
@@ -344,10 +368,14 @@ public class FirstPersonController : MonoBehaviour
 
         if (animator != null)
         {
-            bool moving = planarVelocity.magnitude > 0.25f;
+            // 실제로 움직인 속도로 애니메이션합니다. 벽·문에 막혀 있으면 제자리걸음(팔이 벽에 들어감) 대신 가만히 섭니다.
+            Vector3 actual = characterController.velocity;
+            actual.y = 0f;
+            float actualSpeed = actual.magnitude;
+            bool moving = actualSpeed > 0.25f;
             animator.SetBool("IsWalking", moving);
             // 걷기 애니메이션(약 1.4m/s 기준)을 실제 속도에 맞춰 발이 미끄러지지 않게
-            animator.speed = moving ? Mathf.Clamp(planarVelocity.magnitude / 1.4f, 0.7f, 1.5f) : 1f;
+            animator.speed = moving ? Mathf.Clamp(actualSpeed / 1.4f, 0.7f, 1.5f) : 1f;
         }
     }
 
