@@ -14,10 +14,20 @@ public static class FurnitureColliders
         int added = 0;
         var done = new HashSet<Transform>();
 
+        // 밀리는 가구(여행가방 등)는 고정합니다. 캐릭터가 부딪혀 가구가 날아다니면 이상해 보입니다.
+        foreach (Rigidbody body in Object.FindObjectsOfType<Rigidbody>())
+        {
+            if (body.isKinematic) continue;
+            if (body.GetComponentInParent<FirstPersonController>() != null || body.GetComponentInParent<HiddenCat>() != null) continue;
+            body.isKinematic = true;
+        }
+
         foreach (MeshRenderer renderer in Object.FindObjectsOfType<MeshRenderer>())
         {
             if (!renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
             if (ShouldSkip(renderer.transform)) continue;
+            // 커튼은 몸으로 지나갈 수 있어야 자연스럽습니다.
+            if (renderer.name.IndexOf("curtain", System.StringComparison.OrdinalIgnoreCase) >= 0) continue;
             if (HasColliderAround(renderer.transform)) continue;
 
             MeshFilter filter = renderer.GetComponent<MeshFilter>();

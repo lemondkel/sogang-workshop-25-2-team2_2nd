@@ -131,10 +131,11 @@ public class FirstPersonController : MonoBehaviour
         // 캐릭터 모델(약 1.8m)에 맞는 캡슐
         characterController.height = 1.75f;
         characterController.center = new Vector3(0, 0.9f, 0);
-        characterController.radius = 0.3f;
-        characterController.skinWidth = 0.03f; // 반지름의 10% 권장. 기본값 0.08은 벽에서 8cm 떨어져 멈추고 틈에 끼기 쉽습니다.
+        // 몸 메시의 어깨 반폭이 0.39m라 반지름이 작으면 팔이 벽에 파묻힙니다.
+        characterController.radius = 0.38f;
+        characterController.skinWidth = 0.035f; // 반지름의 10% 권장. 기본값 0.08은 벽에서 8cm 떨어져 멈추고 틈에 끼기 쉽습니다.
         characterController.minMoveDistance = 0f;
-        characterController.stepOffset = 0.3f; // 낮은 가구(테이블·캣휠 받침)에 올라타지 않도록
+        characterController.stepOffset = 0.15f; // 밥그릇(19cm)·낮은 가구에 올라타지 않도록
 
         animator = GetComponentInChildren<Animator>();
         if (animator != null)
