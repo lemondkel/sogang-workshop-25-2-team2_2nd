@@ -345,10 +345,11 @@ public class FirstPersonController : MonoBehaviour
 
         characterController.Move((move + Vector3.up * verticalVelocity) * Time.deltaTime);
 
-        // 캐릭터 몸 방향: 실제로 가는 방향(벽을 따라 미끄러지면 벽과 나란히)을 봅니다. 그래야 팔다리가 벽 쪽으로 흔들리지 않습니다.
+        // 캐릭터 몸 방향: 누른 방향을 봅니다. 벽에 막혀도 벽 쪽을 보고 제자리걸음을 합니다 (다른 데로 가려는 것처럼 보이지 않게).
+        // Hips를 캡슐 중심에 고정하고 벽에서 0.18m 띄우므로 제자리걸음을 해도 팔다리가 벽에 닿지 않습니다.
         if (viewMode == ViewMode.ThirdPerson)
         {
-            Vector3 faceDir = move.sqrMagnitude > 0.05f ? move : Vector3.zero;
+            Vector3 faceDir = planarVelocity;
             if (faceDir.sqrMagnitude > 0.05f)
             {
                 Quaternion face = Quaternion.LookRotation(faceDir.normalized, Vector3.up);
@@ -362,14 +363,13 @@ public class FirstPersonController : MonoBehaviour
 
         if (animator != null)
         {
-            // 실제로 움직인 속도로 애니메이션합니다. 벽·문에 막혀 있으면 제자리걸음(팔이 벽에 들어감) 대신 가만히 섭니다.
+            // 방향키를 누르고 있으면 걷습니다. 벽에 막히면 천천히 제자리걸음, 미끄러지면 실제 속도에 맞춰 발이 덜 미끄러지게.
             Vector3 actual = characterController.velocity;
             actual.y = 0f;
             float actualSpeed = actual.magnitude;
-            bool moving = actualSpeed > 0.25f;
+            bool moving = planarVelocity.magnitude > 0.25f;
             animator.SetBool("IsWalking", moving);
-            // 걷기 애니메이션(약 1.4m/s 기준)을 실제 속도에 맞춰 발이 미끄러지지 않게
-            animator.speed = moving ? Mathf.Clamp(actualSpeed / 1.4f, 0.7f, 1.5f) : 1f;
+            animator.speed = moving ? Mathf.Clamp(actualSpeed / 1.4f, 0.55f, 1.5f) : 1f;
         }
     }
 
@@ -417,7 +417,7 @@ public class FirstPersonController : MonoBehaviour
         standoffPushSmoothed = Vector3.Lerp(standoffPushSmoothed, push, 1f - Mathf.Exp(-12f * Time.deltaTime));
         if (standoffPushSmoothed.sqrMagnitude > 1e-6f)
         {
-            move += Vector3.ClampMagnitude(standoffPushSmoothed * 6f, 0.6f);
+            move += Vector3.ClampMagnitude(standoffPushSmoothed * 6f, 0.4f);
         }
         return move;
     }
