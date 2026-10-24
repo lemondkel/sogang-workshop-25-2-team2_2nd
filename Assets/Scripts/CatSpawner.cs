@@ -83,6 +83,8 @@ public static class CatSpawner
             Vector3 spot;
             if (!TryFindSurface(sample, feet.y, mask, out spot)) continue;
             if (Flat(spot - feet).magnitude < MinDistanceFromPlayer) continue;
+            // 걸어갈 수 있는 칸에서 벽을 통과하지 않고 닿는 자리만 (얇은 외벽 너머 바깥이나 다른 집에 숨지 않도록). 문은 열 수 있으니 통과로 칩니다.
+            if (BlockedLine(cell + Vector3.up * 0.3f, spot + Vector3.up * 0.3f, mask)) continue;
 
             candidates.Add(new Spot { position = spot, hiddenFromStart = IsHidden(eye, spot, mask), cover = CoverScore(spot, mask) });
         }
@@ -115,6 +117,7 @@ public static class CatSpawner
             Vector3 surface;
             if (!TryFindSurface(new Vector3(p.x, feet.y + 2.0f, p.z), feet.y, mask, out surface)) continue;
             if (TooClose(surface, result, 0.6f)) continue;
+            if (BlockedLine(feet + Vector3.up * 0.3f, surface + Vector3.up * 0.3f, mask)) continue;
             result.Add(new Spot { position = surface, hiddenFromStart = IsHidden(eye, surface, mask) });
         }
         if (result.Count < count)
@@ -233,11 +236,10 @@ public static class CatSpawner
         float height = hit.point.y - floorY;
         if (height < -0.5f || height > 1.6f) return false;
 
-        // 고양이가 들어갈 공간이 있는지 (웅크린 고양이 높이 약 0.5m). 침대·책상 밑처럼 낮은 틈에도 숨을 수 있게 0.1~0.5m만 봅니다.
-        Vector3 center = hit.point + Vector3.up * 0.3f;
-        if (Physics.CheckBox(center, new Vector3(0.24f, 0.2f, 0.24f), Quaternion.identity, mask, QueryTriggerInteraction.Ignore)) return false;
-        // 바닥에 닿지 않도록 바닥에서 3cm 띄운 캡슐(높이 0.03~0.53)로 옆 여유를 봅니다.
-        if (Physics.CheckCapsule(hit.point + Vector3.up * 0.28f, hit.point + Vector3.up * 0.29f, 0.25f, mask, QueryTriggerInteraction.Ignore)) return false;
+        // 고양이가 들어갈 공간이 있는지: 고양이 콜라이더(반지름 0.22m, 높이 0.42m까지)보다 조금 큰 상자(바닥 위 0.03~0.52m, 좌우 ±0.24m)가 비어 있어야 합니다.
+        // 침대·책상 밑처럼 낮은 틈에도 숨을 수 있게 0.52m까지만 봅니다. 상자라서 변기·수납장 밑단처럼 낮은 가구 몸체도 걸러집니다.
+        Vector3 center = hit.point + Vector3.up * 0.275f;
+        if (Physics.CheckBox(center, new Vector3(0.24f, 0.245f, 0.24f), Quaternion.identity, mask, QueryTriggerInteraction.Ignore)) return false;
 
         // 실내인지 (위에 천장이 있어야 함)
         if (!Physics.Raycast(hit.point + Vector3.up * 0.2f, Vector3.up, 6f, mask, QueryTriggerInteraction.Ignore)) return false;

@@ -48,6 +48,16 @@ public class HiddenCat : MonoBehaviour
         baseScale = transform.localScale;
 
         animator = GetComponentInChildren<Animator>();
+
+        // 프리팹 콜라이더(반지름 0.15×스케일 2.03 = 0.3m)는 몸보다 넓어 가구 밑에서 가구와 겹치는 것으로 잡혔습니다. 몸 크기에 맞춥니다 (반지름 약 0.22m).
+        CapsuleCollider body = GetComponent<CapsuleCollider>();
+        if (body != null)
+        {
+            body.radius = 0.11f;
+            body.height = 0.1f;
+            body.center = new Vector3(0f, 0.1f, -0.03f);
+        }
+
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
