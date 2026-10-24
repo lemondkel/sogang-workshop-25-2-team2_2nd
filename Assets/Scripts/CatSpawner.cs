@@ -88,6 +88,9 @@ public static class CatSpawner
             if (Flat(spot - feet).magnitude < MinDistanceFromPlayer) continue;
             // 걸어갈 수 있는 칸에서 벽을 통과하지 않고 닿는 자리만 (얇은 외벽 너머 바깥이나 다른 집에 숨지 않도록). 문은 열 수 있으니 통과로 칩니다.
             if (BlockedLine(cell + Vector3.up * 0.3f, spot + Vector3.up * 0.3f, mask)) continue;
+            // 그 칸에 서거나 앉았을 때 눈높이에서 고양이가 보여야 합니다 (침대 깊숙한 밑처럼 가까이 가도 못 보는 자리 제외)
+            Vector3 catEye = spot + Vector3.up * 0.15f;
+            if (BlockedLine(cell + Vector3.up * 0.9f, catEye, mask) && BlockedLine(cell + Vector3.up * 1.5f, catEye, mask)) continue;
 
             candidates.Add(new Spot { position = spot, hiddenFromStart = IsHidden(eye, spot, mask), cover = CoverScore(spot, mask) });
         }

@@ -36,6 +36,7 @@ public class HiddenCat : MonoBehaviour
     private FirstPersonController controller;
     private readonly List<Vector3> path = new List<Vector3>();
     private int pathIndex;
+    private bool replanned;
     private int senseStreak;
     private Vector3 target;
     private float moveSpeed;
@@ -216,6 +217,7 @@ public class HiddenCat : MonoBehaviour
         {
             if (!CatNav.FindPath(transform.position, candidates[i].position, path)) continue;
             pathIndex = 0;
+            replanned = false;
             target = path[0];
             mode = moveMode;
             moveSpeed = moveMode == Mode.Flee ? FleeSpeed : WalkSpeed;
@@ -244,9 +246,18 @@ public class HiddenCat : MonoBehaviour
         }
         Vector3 dir = to / dist;
 
-        // 바로 앞이 막혔으면(문이 닫혔거나 플레이어가 서 있으면) 거기서 멈춥니다 (길찾기와 같은 몸 크기 상자로 확인)
+        // 바로 앞이 막혔으면(문이 닫혔거나 뭔가 놓여 있으면) 한 번 길을 다시 찾고, 그래도 막히면 거기서 멈춥니다 (길찾기와 같은 몸 크기 상자로 확인)
         if (CatNav.Blocked(transform.position, dir, Mathf.Min(0.3f, dist)))
         {
+            Vector3 destination = path[path.Count - 1];
+            if (!replanned && CatNav.FindPath(transform.position, destination, path))
+            {
+                replanned = true;
+                pathIndex = 0;
+                target = path[0];
+                return;
+            }
+            Debug.Log("[HiddenCat] " + name + " 멈춤(앞 막힘) " + transform.position + " → " + destination);
             Arrive();
             return;
         }
@@ -264,6 +275,7 @@ public class HiddenCat : MonoBehaviour
         }
         else
         {
+            Debug.Log("[HiddenCat] " + name + " 멈춤(발밑 없음) " + transform.position);
             Arrive();
             return;
         }
