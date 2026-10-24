@@ -86,6 +86,12 @@ public class FirstPersonController : MonoBehaviour
     private Quaternion[] crouchPreRot, crouchPostRot;
     private bool crouchPoseWritten;
 
+    // 걷기 클립은 제자리 걷기가 아니라 Hips가 앞으로 최대 0.4m 이동했다가 되돌아옵니다(루트 모션은 꺼져 있어 캡슐은 그대로).
+    // 그래서 몸이 캡슐보다 앞에 그려져 가구에 파묻혀 보였습니다. Hips의 수평 위치를 캡슐 중심(대기 자세 값)에 고정합니다.
+    private Vector3 hipsIdleLocal; // 캐릭터 루트 기준
+    private bool hipsIdleCached;
+    private Vector3 standoffPushSmoothed;
+
     // 1인칭 손 위치 (카메라 기준). 오른손은 간식을 든 것처럼 조금 더 앞에.
     // 팔이 쭉 펴진 '좀비 자세'가 되지 않도록 조금 가깝고 낮게 (화면 아래쪽 1/3에 보입니다)
     private static readonly Vector3 RightHandOffset = new Vector3(0.20f, -0.17f, 0.40f);
@@ -146,6 +152,11 @@ public class FirstPersonController : MonoBehaviour
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
         }
         FindBones();
+        if (hips != null)
+        {
+            hipsIdleLocal = transform.InverseTransformPoint(hips.position);
+            hipsIdleCached = true;
+        }
         crouchBones = new Transform[] { hips, spine, leftUpLeg, leftLeg, leftFoot, rightUpLeg, rightLeg, rightFoot };
         crouchPrePos = new Vector3[crouchBones.Length];
         crouchPostPos = new Vector3[crouchBones.Length];
@@ -402,9 +413,11 @@ public class FirstPersonController : MonoBehaviour
             Standoff(l1, l2, rLow, r, skin, dirs[i], mask, ref move, ref push);
         }
 
-        if (push.sqrMagnitude > 1e-6f)
+        // 두 면 사이(문짝과 기둥 사이 등)에서 프레임마다 다른 면이 잡혀 좌우로 떨리지 않도록 밀어내는 힘을 부드럽게 섞습니다.
+        standoffPushSmoothed = Vector3.Lerp(standoffPushSmoothed, push, 1f - Mathf.Exp(-12f * Time.deltaTime));
+        if (standoffPushSmoothed.sqrMagnitude > 1e-6f)
         {
-            move += Vector3.ClampMagnitude(push * 6f, 0.6f);
+            move += Vector3.ClampMagnitude(standoffPushSmoothed * 6f, 0.6f);
         }
         return move;
     }
@@ -494,6 +507,7 @@ public class FirstPersonController : MonoBehaviour
     void LateUpdate()
     {
         if (cam == null) return;
+        PinHipsToCapsule();
         ApplyCrouchPose();
         if (viewMode == ViewMode.ThirdPerson) PlaceThirdPersonCamera();
         else PlaceFirstPersonCamera();
@@ -503,6 +517,20 @@ public class FirstPersonController : MonoBehaviour
             float wantedFov = viewMode == ViewMode.ThirdPerson ? fieldOfView : firstPersonFieldOfView;
             camera3d.fieldOfView = Mathf.Lerp(camera3d.fieldOfView, wantedFov, 1f - Mathf.Exp(-8f * Time.deltaTime));
         }
+    }
+
+    /// <summary>
+    /// 애니메이션이 Hips를 앞뒤·좌우로 옮겨도(제자리 걷기가 아닌 클립) 몸이 캡슐 중심에 머물도록 수평 위치만 되돌립니다.
+    /// 위아래 움직임(걸을 때 들썩임)은 그대로 둡니다.
+    /// </summary>
+    void PinHipsToCapsule()
+    {
+        if (!hipsIdleCached || hips == null) return;
+        Vector3 local = transform.InverseTransformPoint(hips.position);
+        if (Mathf.Abs(local.x - hipsIdleLocal.x) < 0.001f && Mathf.Abs(local.z - hipsIdleLocal.z) < 0.001f) return;
+        local.x = hipsIdleLocal.x;
+        local.z = hipsIdleLocal.z;
+        hips.position = transform.TransformPoint(local);
     }
 
     /// <summary>

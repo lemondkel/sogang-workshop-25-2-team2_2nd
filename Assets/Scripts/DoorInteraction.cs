@@ -50,7 +50,17 @@ public static class DoorInteraction
         FieldInfo open = type.GetField("open", Flags);
         if (open == null || open.FieldType != typeof(bool)) return false;
         MethodInfo opening = type.GetMethod("opening", Flags);
-        return opening != null && typeof(IEnumerator).IsAssignableFrom(opening.ReturnType);
+        if (opening == null || !typeof(IEnumerator).IsAssignableFrom(opening.ReturnType)) return false;
+
+        // 애니메이터가 비어 있는 문(씬에서 연결이 빠진 것)은 열면 NullReference가 나므로 상호작용 대상에서 뺍니다.
+        bool hasAnimatorField = false;
+        foreach (FieldInfo f in type.GetFields(Flags))
+        {
+            if (f.FieldType != typeof(Animator)) continue;
+            hasAnimatorField = true;
+            if ((Animator)f.GetValue(mb) != null) return true;
+        }
+        return !hasAnimatorField;
     }
 
     public static bool IsOpen(MonoBehaviour door)
