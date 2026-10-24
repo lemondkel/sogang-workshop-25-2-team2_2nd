@@ -110,8 +110,9 @@ public class FirstPersonController : MonoBehaviour
     private const float HugReachEnd = 0.45f; // 손을 뻗는 시간
     private const float HugLiftEnd = 1.0f;   // 고양이가 품에 들어오는 시간
     private const float HugDuration = 2.8f;  // 전체 길이
+    private float hugOrbitAngle = 70f;       // 안아줄 때 카메라가 도는 방향 (벽이 없는 쪽을 고릅니다)
     public bool IsHugging { get { return hugCat != null; } }
-    public bool IsCrouching { get { return isCrouching; } }
+    public bool IsCrouching { get { return isCrouching || crouchBlend > 0.5f; } }
 
     int EnvironmentMask
     {
@@ -299,12 +300,36 @@ public class FirstPersonController : MonoBehaviour
             if (GameManager.Instance.Hud != null) GameManager.Instance.Hud.SetInteractPrompt(null);
             GameManager.Instance.SetCrosshairVisuals(false);
         }
+        hugOrbitAngle = PickHugOrbit();
         return HugDuration;
+    }
+
+    /// <summary>
+    /// 고양이는 구석·벽가에 숨어 있어서 카메라를 무조건 앞으로 돌리면 벽에 막힙니다.
+    /// 앞·옆 몇 방향을 재 보고 가장 트인 쪽을 고릅니다.
+    /// </summary>
+    float PickHugOrbit()
+    {
+        float[] angles = { 70f, -70f, 100f, -100f, 45f, -45f, 130f, -130f, 0f };
+        Vector3 center = transform.position + Vector3.up * Mathf.Lerp(cameraHeight, cameraHeight - crouchHipsDrop, crouchBlend);
+        int mask = EnvironmentMask;
+        float bestClear = -1f;
+        float best = 0f;
+        foreach (float a in angles)
+        {
+            Vector3 dir = Quaternion.Euler(18f, yaw + a, 0) * Vector3.back;
+            RaycastHit hit;
+            float clear = Physics.SphereCast(center, cameraRadius, dir, out hit, 1.45f, mask, QueryTriggerInteraction.Ignore) ? hit.distance : 1.45f;
+            if (clear >= 1.2f) return a;          // 충분히 트였으면 앞선 순서(앞쪽 우선)대로
+            if (clear > bestClear) { bestClear = clear; best = a; }
+        }
+        return best;
     }
 
     void UpdateHug()
     {
         hugTime += Time.deltaTime;
+        UpdateCrouch(); // 앉은 채로 안아주거나 중간에 일어나도 자세가 이어지도록
         // 서 있기만 하되 중력은 받습니다
         if (characterController.isGrounded) verticalVelocity = -2f;
         else verticalVelocity -= gravity * Time.deltaTime;
@@ -333,7 +358,7 @@ public class FirstPersonController : MonoBehaviour
         Vector3 forward = transform.forward;
         Vector3 right = transform.right;
         float chestHeight = Mathf.Lerp(1.12f, 1.12f - crouchHipsDrop, crouchBlend);
-        Vector3 chest = transform.position + Vector3.up * chestHeight + forward * 0.34f;
+        Vector3 chest = transform.position + Vector3.up * chestHeight + forward * 0.40f;
         if (viewMode == ViewMode.FirstPerson)
         {
             // 1인칭에서는 화면 아래쪽에 고양이가 보이도록 카메라 기준으로 둡니다
@@ -350,7 +375,7 @@ public class FirstPersonController : MonoBehaviour
 
         // 고양이: 제자리 → 품으로 (살짝 위로 포물선을 그리며)
         Vector3 catPos = Vector3.Lerp(hugStartPos, chest, lift) + Vector3.up * (Mathf.Sin(lift * Mathf.PI) * 0.15f + bob);
-        Quaternion heldRot = Quaternion.LookRotation(forward, Vector3.up) * Quaternion.Euler(-18f, 0f, 0f); // 앞을 보며 살짝 안긴 자세
+        Quaternion heldRot = Quaternion.LookRotation(-forward, Vector3.up) * Quaternion.Euler(-25f, 0f, 0f); // 플레이어 얼굴을 올려다보며 안긴 자세
         hugCat.transform.SetPositionAndRotation(catPos, Quaternion.Slerp(hugStartRot, heldRot, lift));
 
         // 두 손: 고양이 양옆을 감싸 쥡니다
@@ -787,7 +812,7 @@ public class FirstPersonController : MonoBehaviour
     {
         // 안아줄 때는 카메라가 캐릭터 오른쪽 앞으로 돌아 들어와 품에 안긴 고양이가 보이게 합니다 (뒤에서는 몸에 가립니다)
         float orbit = Mathf.SmoothStep(0f, 1f, hugZoom);
-        Quaternion rotation = Quaternion.Euler(Mathf.Lerp(pitch, 18f, orbit), yaw + 70f * orbit, 0);
+        Quaternion rotation = Quaternion.Euler(Mathf.Lerp(pitch, 18f, orbit), yaw + hugOrbitAngle * orbit, 0);
         int mask = EnvironmentMask;
         RaycastHit hit;
 
@@ -800,7 +825,7 @@ public class FirstPersonController : MonoBehaviour
         {
             sideLength = Mathf.Max(0f, hit.distance - 0.05f);
         }
-        Vector3 pivot = center + side * sideLength;
+        Vector3 pivot = center + side * sideLength * (1f - orbit); // 안아줄 때는 캐릭터 중심을 돕니다
 
         float distance = Mathf.Lerp(cameraDistance, 1.45f, orbit);
         Vector3 desired = pivot + rotation * new Vector3(shoulderOffset * (1f - orbit), 0, -distance);

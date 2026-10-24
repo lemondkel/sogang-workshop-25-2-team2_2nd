@@ -43,6 +43,8 @@ public static class CatSpawner
 
     /// <summary>마지막 FindSpots에서 찾은 숨을 자리 후보 전부. 고양이가 돌아다닐 때 갈 곳으로 씁니다.</summary>
     public static List<Spot> LastCandidates { get; private set; } = new List<Spot>();
+    /// <summary>마지막 FindSpots에서 찾은 걸어갈 수 있는 바닥 칸. 고양이 길찾기(CatNav)에 씁니다.</summary>
+    public static List<Vector3> LastWalkable { get; private set; } = new List<Vector3>();
 
     /// <param name="feet">플레이어 발 위치</param>
     /// <param name="eye">플레이어 눈(카메라) 위치</param>
@@ -70,6 +72,7 @@ public static class CatSpawner
 
         // 1) 걸어갈 수 있는 바닥 격자 탐색
         List<Vector3> walkable = FloodWalkable(feet, mask);
+        LastWalkable = walkable;
 
         // 2) 후보 위치 수집
         List<Spot> candidates = new List<Spot>();

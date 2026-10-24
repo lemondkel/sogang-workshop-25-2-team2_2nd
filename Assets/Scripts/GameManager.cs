@@ -184,6 +184,7 @@ public class GameManager : MonoBehaviour
         CharacterController cc = player != null ? player.GetComponent<CharacterController>() : null;
         if (cc != null) cc.enabled = false;
         List<CatSpawner.Spot> spots = CatSpawner.FindSpots(feet, eye, total, Level.hiddenRatio, preferred, Level.minCover);
+        if (Level.catsWander) CatNav.Build(CatSpawner.LastWalkable, feet, CatSpawner.EnvironmentMask); // 고양이가 돌아다닐 길
         if (cc != null) cc.enabled = true;
 
         // FindSpots는 지정 위치 → 숨겨진 자리 순으로 돌려주므로, 앞쪽은 진짜 고양이, 뒤쪽은 옆집 고양이가 차지합니다.

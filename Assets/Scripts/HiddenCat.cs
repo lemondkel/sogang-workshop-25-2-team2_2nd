@@ -34,6 +34,9 @@ public class HiddenCat : MonoBehaviour
     private List<CatSpawner.Spot> spots;
     private Transform player;
     private FirstPersonController controller;
+    private readonly List<Vector3> path = new List<Vector3>();
+    private int pathIndex;
+    private int senseStreak;
     private Vector3 target;
     private float moveSpeed;
     private float restUntil, tiredUntil, nextSenseTime;
@@ -91,8 +94,9 @@ public class HiddenCat : MonoBehaviour
         player = playerTransform;
         controller = playerTransform != null ? playerTransform.GetComponent<FirstPersonController>() : null;
         minCover = minCoverForSpots;
-        canWander = spots != null && spots.Count > 0 && player != null;
+        canWander = spots != null && spots.Count > 0 && player != null && CatNav.Ready;
         restUntil = Time.time + Random.Range(3f, 10f);
+        if (!canWander) Debug.LogWarning("[HiddenCat] " + name + " 돌아다니기 꺼짐: 자리 " + (spots != null ? spots.Count : 0) + "개, 플레이어 " + (player != null) + ", 길 " + CatNav.Ready);
     }
 
     void Update()
@@ -107,7 +111,9 @@ public class HiddenCat : MonoBehaviour
                 if (Time.time >= nextSenseTime)
                 {
                     nextSenseTime = Time.time + 0.2f;
-                    if (SensesPlayer() && TryFlee(false)) break;
+                    // 두 번 연속(0.4초) 보여야 도망칩니다 (스쳐 지나가는 플레이어에 바로 튀지 않도록)
+                    senseStreak = SensesPlayer() ? senseStreak + 1 : 0;
+                    if (senseStreak >= 2 && TryFlee(false)) { senseStreak = 0; break; }
                 }
                 if (Time.time >= restUntil)
                 {
@@ -128,7 +134,8 @@ public class HiddenCat : MonoBehaviour
         if (Time.time < tiredUntil || fleeCount >= MaxFlees || player == null) return false;
         Vector3 toPlayer = player.position - transform.position;
         toPlayer.y = 0f;
-        float alert = controller != null && controller.IsCrouching ? SneakDistance : AlertDistance;
+        bool sneaking = controller != null && controller.IsCrouching;
+        float alert = sneaking ? SneakDistance : AlertDistance;
         if (toPlayer.magnitude > alert) return false;
         // 벽·가구 너머의 플레이어는 보지 못합니다
         Vector3 eye = transform.position + Vector3.up * 0.3f;
@@ -136,12 +143,13 @@ public class HiddenCat : MonoBehaviour
         return !Physics.Linecast(eye, chest, CatSpawner.EnvironmentMask, QueryTriggerInteraction.Ignore);
     }
 
+    struct Candidate { public Vector3 position; public float score; }
+    private static readonly List<Candidate> candidates = new List<Candidate>();
+
     bool TryWander()
     {
         Vector3 here = transform.position;
-        Vector3 best = Vector3.zero;
-        float bestScore = float.MinValue;
-        int tries = 0;
+        candidates.Clear();
         foreach (CatSpawner.Spot s in spots)
         {
             if (s.cover < minCover) continue;
@@ -150,22 +158,15 @@ public class HiddenCat : MonoBehaviour
             float d = Flat(p - here).magnitude;
             if (d < 1.5f || d > SpotRadius) continue;
             if (player != null && Flat(p - player.position).magnitude < 3.0f) continue; // 플레이어 쪽으로는 가지 않습니다
-            if (tries++ > 40) break;
-            if (!PathClear(here, p)) continue;
-            float score = Random.value * 2f + s.cover * 0.3f;
-            if (score > bestScore) { bestScore = score; best = p; }
+            candidates.Add(new Candidate { position = p, score = Random.value * 2f + s.cover * 0.3f });
         }
-        if (bestScore == float.MinValue) return false;
-        StartMove(best, Mode.Walk);
-        return true;
+        return StartMoveToBest(Mode.Walk);
     }
 
     bool TryFlee(bool force)
     {
         Vector3 here = transform.position;
-        Vector3 best = Vector3.zero;
-        float bestScore = float.MinValue;
-        int tries = 0;
+        candidates.Clear();
         foreach (CatSpawner.Spot s in spots)
         {
             if (!force && s.cover < minCover) continue;
@@ -175,28 +176,39 @@ public class HiddenCat : MonoBehaviour
             if (d < 1.5f || d > SpotRadius) continue;
             float fromPlayer = player != null ? Flat(p - player.position).magnitude : 10f;
             if (fromPlayer < 3.5f) continue;
-            if (tries++ > 60) break;
-            if (!PathClear(here, p)) continue;
             // 플레이어에게서 멀어지는 방향, 너무 멀지 않은 자리, 잘 가려진 자리를 좋아합니다
-            float score = fromPlayer - d * 0.4f + s.cover * 0.4f + Random.value;
-            if (score > bestScore) { bestScore = score; best = p; }
+            candidates.Add(new Candidate { position = p, score = fromPlayer - d * 0.4f + s.cover * 0.4f + Random.value });
         }
-        if (bestScore == float.MinValue) return false; // 구석에 몰림: 그대로 있다가 잡힙니다
+        if (!StartMoveToBest(Mode.Flee)) return false; // 구석에 몰림: 그대로 있다가 잡힙니다
         fleeCount++;
-        StartMove(best, Mode.Flee);
+        if (player != null)
+        {
+            Debug.Log("[HiddenCat] " + name + " 도망 " + fleeCount + "회: 플레이어 거리 " + Flat(player.position - here).magnitude.ToString("0.00")
+                + "m, 앉음 " + (controller != null && controller.IsCrouching) + ", 목적지 " + path[path.Count - 1]);
+        }
         return true;
     }
 
-    void StartMove(Vector3 destination, Mode moveMode)
+    /// <summary>점수가 높은 자리부터 길이 있는지 확인해서 첫 번째로 갈 수 있는 자리로 출발합니다.</summary>
+    bool StartMoveToBest(Mode moveMode)
     {
-        target = destination;
-        mode = moveMode;
-        moveSpeed = moveMode == Mode.Flee ? FleeSpeed : WalkSpeed;
-        if (animator != null)
+        candidates.Sort((a, b) => b.score.CompareTo(a.score));
+        int tries = Mathf.Min(candidates.Count, 8);
+        for (int i = 0; i < tries; i++)
         {
-            animator.Play("walk", 0, Random.value);
-            animator.speed = moveMode == Mode.Flee ? 1.8f : 1.0f;
+            if (!CatNav.FindPath(transform.position, candidates[i].position, path)) continue;
+            pathIndex = 0;
+            target = path[0];
+            mode = moveMode;
+            moveSpeed = moveMode == Mode.Flee ? FleeSpeed : WalkSpeed;
+            if (animator != null)
+            {
+                animator.Play("walk", 0, Random.value);
+                animator.speed = moveMode == Mode.Flee ? 1.8f : 1.0f;
+            }
+            return true;
         }
+        return false;
     }
 
     void Step()
@@ -205,12 +217,18 @@ public class HiddenCat : MonoBehaviour
         Vector3 to = target - transform.position;
         to.y = 0f;
         float dist = to.magnitude;
-        if (dist < 0.08f) { Arrive(); return; }
+        if (dist < 0.08f)
+        {
+            pathIndex++;
+            if (pathIndex >= path.Count) { Arrive(); return; }
+            target = path[pathIndex];
+            return;
+        }
         Vector3 dir = to / dist;
 
         // 바로 앞이 막혔으면(문이 닫혔거나 플레이어가 서 있으면) 거기서 멈춥니다
         RaycastHit ahead;
-        if (Physics.SphereCast(transform.position + Vector3.up * 0.25f, 0.16f, dir, out ahead, 0.4f, mask, QueryTriggerInteraction.Ignore)
+        if (Physics.SphereCast(transform.position + Vector3.up * 0.25f, 0.14f, dir, out ahead, 0.35f, mask, QueryTriggerInteraction.Ignore)
             && !ahead.collider.transform.IsChildOf(transform))
         {
             Arrive();
@@ -239,7 +257,9 @@ public class HiddenCat : MonoBehaviour
         if (vanishOnArrive)
         {
             // 옆집 고양이가 도망칠 때는 멀어질수록 작아지다가 사라집니다
-            transform.localScale = baseScale * Mathf.Clamp01(dist / 2.5f + 0.15f);
+            float remaining = dist;
+            for (int i = pathIndex + 1; i < path.Count; i++) remaining += Vector3.Distance(path[i - 1], path[i]);
+            transform.localScale = baseScale * Mathf.Clamp01(remaining / 2.5f + 0.15f);
         }
         if (animator != null)
         {
@@ -253,35 +273,13 @@ public class HiddenCat : MonoBehaviour
         if (vanishOnArrive) { mode = Mode.Gone; Destroy(gameObject); return; }
         if (mode == Mode.Flee) tiredUntil = Time.time + TiredSeconds;
         mode = Mode.Rest;
+        senseStreak = 0;
         restUntil = Time.time + Random.Range(6f, 14f);
         if (animator != null)
         {
             animator.speed = 1f;
             animator.Play(Random.value < 0.5f ? "idle" : "sit", 0, 0f);
         }
-    }
-
-    /// <summary>고양이 키 높이에서 똑바로 걸어갈 수 있는지 (벽·가구·닫힌 문에 막히지 않고, 바닥이 이어지는지).</summary>
-    bool PathClear(Vector3 from, Vector3 to)
-    {
-        int mask = CatSpawner.EnvironmentMask;
-        Vector3 a = from + Vector3.up * 0.25f;
-        Vector3 d = Flat(to - from);
-        float len = d.magnitude;
-        if (len < 0.01f) return false;
-        d /= len;
-        RaycastHit hit;
-        if (Physics.SphereCast(a, 0.16f, d, out hit, len, mask, QueryTriggerInteraction.Ignore)
-            && !hit.collider.transform.IsChildOf(transform)) return false;
-        // 바닥이 이어지는지 0.5m마다 확인 (계단·구멍 방지)
-        for (float t = 0.5f; t < len; t += 0.5f)
-        {
-            Vector3 p = from + d * t;
-            RaycastHit g;
-            if (!Physics.Raycast(p + Vector3.up * 0.5f, Vector3.down, out g, 1.0f, mask, QueryTriggerInteraction.Ignore)) return false;
-            if (Mathf.Abs(g.point.y - from.y) > 0.25f) return false;
-        }
-        return true;
     }
 
     static Vector3 Flat(Vector3 v) { v.y = 0f; return v; }
