@@ -527,6 +527,56 @@ public class FirstPersonController : MonoBehaviour
     /// 대상(고양이/단서)과 시선 사이에 가리는 것이 있는지. 단, 대상이 '그 안에' 들어 있는 통(빨래통·상자 등)은
     /// 뚜껑이 열려 있으면(또는 뚜껑이 없으면) 가리는 것으로 치지 않습니다. 통 벽은 어디서 봐도 레이를 막기 때문입니다.
     /// </summary>
+    private readonly Collider[] nearCats = new Collider[16];
+
+    /// <summary>
+    /// 2m 안의 고양이 중에서 캐릭터 눈높이에서 보이고(벽·가구에 가려지지 않고) 시선 방향에서 30° 안에 있는 가장 가까운 고양이.
+    /// </summary>
+    ClickableObject FindCatNearAim(Vector3 reachFrom)
+    {
+        int clickable = LayerMask.NameToLayer("Clickable");
+        int mask = clickable >= 0 ? 1 << clickable : InteractMask;
+        int n = Physics.OverlapSphereNonAlloc(reachFrom, 2.0f, nearCats, mask, QueryTriggerInteraction.Ignore);
+        Vector3 eye = transform.position + Vector3.up * Mathf.Lerp(1.55f, 1.55f - crouchHipsDrop, crouchBlend);
+        ClickableObject best = null;
+        float bestAngle = 30f;
+        for (int i = 0; i < n; i++)
+        {
+            Collider c = nearCats[i];
+            if (c == null || !c.enabled || c.transform.IsChildOf(transform)) continue;
+            ClickableObject clickable3 = c.GetComponent<ClickableObject>();
+            if (clickable3 == null || c.GetComponent<HiddenCat>() == null) continue;
+            Vector3 center = c.bounds.center;
+            if (Vector3.Distance(center, reachFrom) > 2.0f) continue;
+            float angle = Vector3.Angle(cam.forward, center - cam.position);
+            if (angle >= bestAngle) continue;
+            if (!VisibleFrom(eye, c)) continue;
+            bestAngle = angle;
+            best = clickable3;
+        }
+        return best;
+    }
+
+    bool VisibleFrom(Vector3 from, Collider target)
+    {
+        Vector3 center = target.bounds.center;
+        Vector3 d = center - from;
+        float dist = d.magnitude;
+        int n = Physics.RaycastNonAlloc(from, d / dist, blockers, dist, EnvironmentMask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            RaycastHit b = blockers[i];
+            if (b.collider == null || b.collider.transform.IsChildOf(transform)) continue;
+            if (b.collider.bounds.Contains(center))
+            {
+                MonoBehaviour lid;
+                if (!DoorInteraction.TryGetLid(b.collider, out lid) || DoorInteraction.IsOpen(lid)) continue;
+            }
+            return false;
+        }
+        return true;
+    }
+
     bool IsOccluded(RaycastHit target, int blockerCount)
     {
         Vector3 center = target.collider.bounds.center;
@@ -667,6 +717,10 @@ public class FirstPersonController : MonoBehaviour
                 target = clickable;
             }
         }
+
+        // 조준점이 세탁기·수납장 같은 가구에 놓여도, 그 옆에 붙어 있는 고양이가 캐릭터 눈에서 보이고 화면 가운데 가까이 있으면 안아줄 수 있습니다.
+        // (3인칭 카메라는 몸 뒤에 있어서 가구 옆 고양이가 카메라에서는 가려지는 일이 잦습니다)
+        if (target == null) target = FindCatNearAim(reachFrom);
 
         // 고양이/단서가 없으면 시선 끝의 문·서랍을 봅니다
         MonoBehaviour door = null;
