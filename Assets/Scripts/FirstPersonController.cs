@@ -372,9 +372,8 @@ public class FirstPersonController : MonoBehaviour
         if (move.sqrMagnitude < 1e-4f) return move;
 
         float r = characterController.radius;
-        float reach = wallStandoff + characterController.skinWidth;
-        Vector3 p1 = transform.position + Vector3.up * (characterController.stepOffset + r + 0.02f);
-        Vector3 p2 = transform.position + Vector3.up * Mathf.Max(characterController.height - r, characterController.stepOffset + r + 0.03f);
+        float skin = characterController.skinWidth;
+        float step = characterController.stepOffset;
         int mask = EnvironmentMask;
 
         Vector3 forward = move.normalized;
@@ -384,33 +383,51 @@ public class FirstPersonController : MonoBehaviour
             forward,
             (forward + right).normalized, (forward - right).normalized,
             right, -right,
+            (-forward + right).normalized, (-forward - right).normalized,
         };
+
+        // 캡슐캐스트는 시작할 때 이미 겹친 콜라이더를 무시하므로, 실제 캡슐보다 조금 작은 캡슐로 쏘고 거리를 그만큼 더 봅니다.
+        // 위쪽 캡슐(몸통)과 아래쪽 캡슐(무릎~허벅지: 침대·책상처럼 낮은 가구용) 두 개를 씁니다.
+        float rHigh = r - 0.05f;
+        Vector3 h1 = transform.position + Vector3.up * (step + 0.02f + rHigh);
+        Vector3 h2 = transform.position + Vector3.up * Mathf.Max(characterController.height - r, step + 0.03f + rHigh);
+        float rLow = 0.22f;
+        Vector3 l1 = transform.position + Vector3.up * (step + 0.03f + rLow);
+        Vector3 l2 = transform.position + Vector3.up * Mathf.Max(0.75f, step + 0.08f + rLow);
 
         Vector3 push = Vector3.zero;
         for (int i = 0; i < dirs.Length; i++)
         {
-            RaycastHit hit;
-            if (!Physics.CapsuleCast(p1, p2, r, dirs[i], out hit, reach, mask, QueryTriggerInteraction.Ignore)) continue;
-            if (hit.collider.transform.IsChildOf(transform)) continue;
-            Vector3 n = hit.normal;
-            n.y = 0f;
-            if (n.sqrMagnitude < 0.01f) continue;
-            n.Normalize();
-
-            // 표면 쪽으로 가는 성분은 뺍니다 (벽을 따라 미끄러짐)
-            float into = Vector3.Dot(move, n);
-            if (into < 0f) move -= n * into;
-
-            // 너무 가까우면 표면 반대쪽으로 조금 밀려납니다
-            float deficit = reach - hit.distance;
-            if (deficit > 0f) push += n * deficit;
+            Standoff(h1, h2, rHigh, r, skin, dirs[i], mask, ref move, ref push);
+            Standoff(l1, l2, rLow, r, skin, dirs[i], mask, ref move, ref push);
         }
 
         if (push.sqrMagnitude > 1e-6f)
         {
-            move += Vector3.ClampMagnitude(push * 8f, 1.0f);
+            move += Vector3.ClampMagnitude(push * 6f, 0.6f);
         }
         return move;
+    }
+
+    void Standoff(Vector3 p1, Vector3 p2, float castRadius, float bodyRadius, float skin, Vector3 dir, int mask, ref Vector3 move, ref Vector3 push)
+    {
+        // 캡슐 표면 기준 wallStandoff 만큼 떨어지려면, 작은 캐스트 캡슐 기준으로는 그 차이만큼 더 멀리 봐야 합니다.
+        float reach = wallStandoff + skin + (bodyRadius - castRadius);
+        RaycastHit hit;
+        if (!Physics.CapsuleCast(p1, p2, castRadius, dir, out hit, reach, mask, QueryTriggerInteraction.Ignore)) return;
+        if (hit.collider.transform.IsChildOf(transform)) return;
+        Vector3 n = hit.normal;
+        n.y = 0f;
+        if (n.sqrMagnitude < 0.01f) return;
+        n.Normalize();
+
+        // 표면 쪽으로 가는 성분은 뺍니다 (벽을 따라 미끄러짐)
+        float into = Vector3.Dot(move, n);
+        if (into < 0f) move -= n * into;
+
+        // 너무 가까우면 표면 반대쪽으로 조금 밀려납니다
+        float deficit = reach - hit.distance;
+        if (deficit > 0f) push += n * deficit;
     }
 
     void UpdateInteraction()
