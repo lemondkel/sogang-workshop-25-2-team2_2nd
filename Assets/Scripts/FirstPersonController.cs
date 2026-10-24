@@ -361,11 +361,12 @@ public class FirstPersonController : MonoBehaviour
 
         // 벽·가구 뒤에 숨은 고양이가 안내 문구로 들통나지 않도록, 시선과 대상 사이를 가리는 것이 있는지 봅니다.
         float nearestBlocker = float.MaxValue;
+        RaycastHit nearestBlockerHit = new RaycastHit();
         int blockerCount = Physics.RaycastNonAlloc(ray, blockers, maxDistance, EnvironmentMask, QueryTriggerInteraction.Ignore);
         for (int i = 0; i < blockerCount; i++)
         {
             if (blockers[i].collider.transform.IsChildOf(transform)) continue;
-            if (blockers[i].distance < nearestBlocker) nearestBlocker = blockers[i].distance;
+            if (blockers[i].distance < nearestBlocker) { nearestBlocker = blockers[i].distance; nearestBlockerHit = blockers[i]; }
         }
 
         ClickableObject target = null;
@@ -385,20 +386,30 @@ public class FirstPersonController : MonoBehaviour
             }
         }
 
+        // 고양이/단서가 없으면 시선 끝의 문·서랍을 봅니다
+        MonoBehaviour door = null;
+        if (target == null && nearestBlockerHit.collider != null && DoorInteraction.TryGet(nearestBlockerHit.collider, out door))
+        {
+            bool inReach = viewMode == ViewMode.ThirdPerson
+                ? Vector3.Distance(nearestBlockerHit.point, reachFrom) <= reachDistance
+                : nearestBlockerHit.distance <= raycastHitDistance;
+            if (!inReach) door = null;
+        }
+
         // 화면 아래 "E 안아주기" 안내 (옆집 고양이가 들통나지 않도록 이름은 쓰지 않습니다)
         string label = null;
-        if (target != null)
-        {
-            label = target.GetComponent<HiddenCat>() != null ? "안아주기" : "살펴보기";
-        }
+        if (target != null) label = target.GetComponent<HiddenCat>() != null ? "안아주기" : "살펴보기";
+        else if (door != null) label = DoorInteraction.Label(door);
         if (GameManager.Instance.Hud != null) GameManager.Instance.Hud.SetInteractPrompt(label);
 
-        if (target != null && (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.E)))
+        bool pressed = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.E);
+        if (pressed && (target != null || door != null))
         {
             if (GameManager.Instance.Hud != null) GameManager.Instance.Hud.PulseInteractPrompt();
-            target.HandleClick();
+            if (target != null) target.HandleClick();
+            else DoorInteraction.Toggle(door);
         }
-        GameManager.Instance.SetCrosshairVisuals(target != null);
+        GameManager.Instance.SetCrosshairVisuals(target != null || door != null);
     }
 
     void LateUpdate()

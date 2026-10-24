@@ -16,7 +16,7 @@ public static class CatSpawner
     const float MinDistanceBetweenCats = 2.2f;
 
     // 고양이(Clickable), UI, 퀘스트 레이어, Ignore Raycast는 지형 판정에서 제외
-    static int EnvironmentMask
+    public static int EnvironmentMask
     {
         get
         {
@@ -86,19 +86,60 @@ public static class CatSpawner
         PickFrom(candidates, result, count - result.Count, false);
         PickFrom(candidates, result, count - result.Count, null);
 
-        // 4) 그래도 부족하면 시작 위치 앞쪽에 배치 (씬에 콜라이더가 거의 없는 경우 대비)
-        int guard = 0;
-        while (result.Count < count && guard++ < 50)
+        // 4) 그래도 부족하면(작은 방 등) 고양이 사이 간격을 조금씩 줄여서 다시 고릅니다.
+        float[] relaxed = { 1.4f, 0.9f, 0.6f };
+        for (int r = 0; r < relaxed.Length && result.Count < count; r++)
         {
-            Vector3 p = feet + Quaternion.Euler(0, Random.Range(0f, 360f), 0) * Vector3.forward * Random.Range(2.5f, 5f);
+            PickFrom(candidates, result, count - result.Count, null, relaxed[r]);
+        }
+
+        // 5) 그래도 부족하면 플레이어 주변을 더 넓게 뒤져서 검증된 표면만 씁니다 (벽 속에 넣지 않습니다).
+        int guard = 0;
+        while (result.Count < count && guard++ < 400)
+        {
+            Vector3 p = feet + Quaternion.Euler(0, Random.Range(0f, 360f), 0) * Vector3.forward * Random.Range(1.5f, 8f);
             Vector3 surface;
-            if (TryFindSurface(new Vector3(p.x, feet.y + 2.0f, p.z), feet.y, mask, out surface)) p = surface;
-            result.Add(new Spot { position = p, hiddenFromStart = false });
+            if (!TryFindSurface(new Vector3(p.x, feet.y + 2.0f, p.z), feet.y, mask, out surface)) continue;
+            if (TooClose(surface, result, 0.6f)) continue;
+            result.Add(new Spot { position = surface, hiddenFromStart = IsHidden(eye, surface, mask) });
+        }
+        if (result.Count < count)
+        {
+            Debug.LogWarning("[CatSpawner] 숨길 자리가 부족합니다: " + result.Count + "/" + count);
         }
         return result;
     }
 
-    static void PickFrom(List<Spot> candidates, List<Spot> result, int want, bool? hidden)
+    /// <summary>
+    /// 생성된 고양이가 벽·가구 콜라이더와 겹치면 수평으로 밀어냅니다 (반쯤 벽에 박힌 고양이 방지).
+    /// </summary>
+    public static void PushOutOfObstacles(GameObject cat)
+    {
+        Collider body = cat.GetComponentInChildren<Collider>();
+        if (body == null) return;
+        int mask = EnvironmentMask;
+        Collider[] near = new Collider[16];
+        for (int iter = 0; iter < 4; iter++)
+        {
+            bool moved = false;
+            int n = Physics.OverlapSphereNonAlloc(body.bounds.center, 0.8f, near, mask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                Collider other = near[i];
+                if (other == null || other.transform.IsChildOf(cat.transform)) continue;
+                Vector3 dir; float dist;
+                if (!Physics.ComputePenetration(body, body.transform.position, body.transform.rotation,
+                                                other, other.transform.position, other.transform.rotation, out dir, out dist)) continue;
+                dir.y = 0f; // 바닥과의 겹침은 무시 (수평으로만 밀어냄)
+                if (dir.sqrMagnitude < 1e-6f || dist < 0.005f) continue;
+                cat.transform.position += dir.normalized * (dist + 0.02f);
+                moved = true;
+            }
+            if (!moved) break;
+        }
+    }
+
+    static void PickFrom(List<Spot> candidates, List<Spot> result, int want, bool? hidden, float minDistance = MinDistanceBetweenCats)
     {
         if (want <= 0) return;
         int picked = 0;
@@ -106,17 +147,17 @@ public static class CatSpawner
         {
             if (picked >= want) break;
             if (hidden.HasValue && c.hiddenFromStart != hidden.Value) continue;
-            if (TooClose(c.position, result)) continue;
+            if (TooClose(c.position, result, minDistance)) continue;
             result.Add(c);
             picked++;
         }
     }
 
-    static bool TooClose(Vector3 p, List<Spot> chosen)
+    static bool TooClose(Vector3 p, List<Spot> chosen, float minDistance = MinDistanceBetweenCats)
     {
         foreach (Spot s in chosen)
         {
-            if (Vector3.Distance(s.position, p) < MinDistanceBetweenCats) return true;
+            if (Vector3.Distance(s.position, p) < minDistance) return true;
         }
         return false;
     }
@@ -136,9 +177,10 @@ public static class CatSpawner
         float height = hit.point.y - floorY;
         if (height < -0.5f || height > 1.6f) return false;
 
-        // 고양이가 들어갈 공간이 있는지
+        // 고양이가 들어갈 공간이 있는지 (몸통 구: 반지름 0.3, 중심 높이 0.2 → 여유를 두고 0.36)
         Vector3 center = hit.point + Vector3.up * 0.4f;
         if (Physics.CheckBox(center, new Vector3(0.28f, 0.25f, 0.28f), Quaternion.identity, mask, QueryTriggerInteraction.Ignore)) return false;
+        if (Physics.CheckSphere(hit.point + Vector3.up * 0.22f, 0.36f, mask, QueryTriggerInteraction.Ignore)) return false;
 
         // 실내인지 (위에 천장이 있어야 함)
         if (!Physics.Raycast(hit.point + Vector3.up * 0.2f, Vector3.up, 6f, mask, QueryTriggerInteraction.Ignore)) return false;
@@ -187,15 +229,15 @@ public static class CatSpawner
                 if (hit.collider is CharacterController) continue;
                 if (hit.normal.y < 0.8f || Mathf.Abs(hit.point.y - feet.y) > 0.45f) continue;
 
-                // 사람이 설 수 있는 공간인지
+                // 사람이 설 수 있는 공간인지 (닫힌 문은 열고 지나갈 수 있으므로 장애물로 치지 않습니다)
                 Vector3 floor = hit.point;
-                if (Physics.CheckCapsule(floor + Vector3.up * 0.45f, floor + Vector3.up * 1.5f, 0.2f, mask, QueryTriggerInteraction.Ignore)) continue;
+                if (BlockedCapsule(floor + Vector3.up * 0.45f, floor + Vector3.up * 1.5f, 0.2f, mask)) continue;
 
                 // 칸 사이에 벽이 있는지 (얇은 벽 통과 방지)
                 Vector3 a = curPos + Vector3.up * 0.6f;
                 Vector3 b = floor + Vector3.up * 0.6f;
-                if (Physics.Linecast(a, b, mask, QueryTriggerInteraction.Ignore)) continue;
-                if (Physics.Linecast(a + Vector3.up * 0.7f, b + Vector3.up * 0.7f, mask, QueryTriggerInteraction.Ignore)) continue;
+                if (BlockedLine(a, b, mask)) continue;
+                if (BlockedLine(a + Vector3.up * 0.7f, b + Vector3.up * 0.7f, mask)) continue;
 
                 visited[next] = floor;
                 queue.Enqueue(next);
@@ -203,6 +245,33 @@ public static class CatSpawner
             }
         }
         return cells;
+    }
+
+    static readonly RaycastHit[] lineHits = new RaycastHit[16];
+    static readonly Collider[] capsuleHits = new Collider[16];
+
+    // 문(여닫이/미닫이/옷장 문/서랍)이 아닌 것에 막히는지
+    static bool BlockedLine(Vector3 a, Vector3 b, int mask)
+    {
+        Vector3 d = b - a;
+        int n = Physics.RaycastNonAlloc(a, d.normalized, lineHits, d.magnitude, mask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            if (lineHits[i].collider is CharacterController) continue;
+            if (!DoorInteraction.IsDoor(lineHits[i].collider)) return true;
+        }
+        return false;
+    }
+
+    static bool BlockedCapsule(Vector3 p0, Vector3 p1, float radius, int mask)
+    {
+        int n = Physics.OverlapCapsuleNonAlloc(p0, p1, radius, capsuleHits, mask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            if (capsuleHits[i] is CharacterController) continue;
+            if (!DoorInteraction.IsDoor(capsuleHits[i])) return true;
+        }
+        return false;
     }
 
     static Vector3 Flat(Vector3 v)

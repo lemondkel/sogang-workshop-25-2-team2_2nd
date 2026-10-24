@@ -37,6 +37,12 @@ public static class FurnitureColliders
             Vector3 worldSize = renderer.bounds.size;
             if (worldSize.x < 0.12f && worldSize.z < 0.12f) continue;
             if (worldSize.y < 0.05f) continue;
+            // 집 바깥(외벽·지붕)과 큰 덩어리는 건너뜁니다. 외벽 모서리 메시의 경계 상자가 방 안까지 1m 넘게 들어옵니다.
+            if (IsExterior(renderer.transform)) continue;
+            int bigAxes = (worldSize.x > 2f ? 1 : 0) + (worldSize.y > 2f ? 1 : 0) + (worldSize.z > 2f ? 1 : 0);
+            if (bigAxes >= 2) continue;
+            // 머리 위(천장 조명 등)는 부딪힐 일이 없습니다.
+            if (renderer.bounds.min.y > 2.0f) continue;
 
             Bounds local = filter.sharedMesh.bounds;
             BoxCollider box = renderer.gameObject.AddComponent<BoxCollider>();
@@ -48,6 +54,17 @@ public static class FurnitureColliders
 
         if (added > 0) Physics.SyncTransforms();
         return added;
+    }
+
+    static bool IsExterior(Transform t)
+    {
+        for (Transform p = t; p != null; p = p.parent)
+        {
+            string n = p.name;
+            if (n.StartsWith("Ext_") || n.IndexOf("exterior", System.StringComparison.OrdinalIgnoreCase) >= 0
+                || n.IndexOf("roof", System.StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        }
+        return false;
     }
 
     // 플레이어, 고양이, 단서(클릭 대상), UI는 손대지 않습니다.

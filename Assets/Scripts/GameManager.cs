@@ -105,6 +105,9 @@ public class GameManager : MonoBehaviour
         int addedColliders = FurnitureColliders.EnsureColliders();
         if (addedColliders > 0) Debug.Log("[FurnitureColliders] 콜라이더 없는 가구 " + addedColliders + "개에 BoxCollider 추가");
 
+        // 문/서랍은 E 키(시선 상호작용)로 여닫습니다. 스크립트 자체의 마우스 오버 입력은 끕니다.
+        DoorInteraction.DisableBuiltInInput();
+
         SpawnLevelCats(db);
 
         hud = gameObject.AddComponent<GameHUD>();
@@ -189,6 +192,7 @@ public class GameManager : MonoBehaviour
             bool decoy = i >= targetCount;
             Quaternion rotation = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
             GameObject go = Instantiate(prefab, spots[i].position, rotation);
+            CatSpawner.PushOutOfObstacles(go); // 벽·가구에 반쯤 박히지 않도록
 
             if (go.GetComponent<ClickableObject>() == null) go.AddComponent<ClickableObject>();
             HiddenCat cat = go.AddComponent<HiddenCat>();
