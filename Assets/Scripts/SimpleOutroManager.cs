@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class SimpleOutroManager : MonoBehaviour
@@ -11,15 +11,26 @@ public class SimpleOutroManager : MonoBehaviour
 
     private float timer = 0f;
 
+    void Start()
+    {
+        Time.timeScale = 1f;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
     void Update()
     {
         timer += Time.deltaTime;
 
-        if (timer >= duration)
+        // 클릭하면 바로 넘어갈 수 있게 (1초 후부터)
+        bool skip = timer > 1f && (Input.GetMouseButtonDown(0) || Input.anyKeyDown);
+
+        if (timer >= duration || skip)
         {
             if (!string.IsNullOrEmpty(introSceneName))
             {
                 SceneManager.LoadScene(introSceneName);
+                enabled = false;
             }
         }
     }
