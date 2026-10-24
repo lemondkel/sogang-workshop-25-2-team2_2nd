@@ -392,7 +392,7 @@ public class FirstPersonController : MonoBehaviour
             {
                 // 대상이 이 통 안에 있음: 뚜껑(문 스크립트)이 닫혀 있을 때만 가림
                 MonoBehaviour lid;
-                if (!DoorInteraction.TryGet(b.collider, out lid) || DoorInteraction.IsOpen(lid)) continue;
+                if (!DoorInteraction.TryGetLid(b.collider, out lid) || DoorInteraction.IsOpen(lid)) continue;
             }
             return true;
         }

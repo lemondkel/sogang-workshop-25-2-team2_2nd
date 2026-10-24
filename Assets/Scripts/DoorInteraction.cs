@@ -47,6 +47,22 @@ public static class DoorInteraction
         return null;
     }
 
+    /// <summary>
+    /// 통(빨래통·상자)의 뚜껑 스크립트를 찾습니다. 뚜껑은 통의 자식(Hamper_01/HamperFlap)에 있는 경우가 많아
+    /// 부모 쪽(TryGet)과 자식 쪽을 모두 봅니다. 없으면 false.
+    /// </summary>
+    public static bool TryGetLid(Collider container, out MonoBehaviour lid)
+    {
+        if (TryGet(container, out lid)) return true;
+        lid = null;
+        if (container == null) return false;
+        foreach (MonoBehaviour mb in container.GetComponentsInChildren<MonoBehaviour>(true))
+        {
+            if (mb != null && IsDoorScript(mb)) { lid = mb; return true; }
+        }
+        return false;
+    }
+
     public static bool IsDoor(Collider collider)
     {
         MonoBehaviour d;
