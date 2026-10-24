@@ -376,6 +376,30 @@ public class FirstPersonController : MonoBehaviour
     }
 
     /// <summary>
+    /// 대상(고양이/단서)과 시선 사이에 가리는 것이 있는지. 단, 대상이 '그 안에' 들어 있는 통(빨래통·상자 등)은
+    /// 뚜껑이 열려 있으면(또는 뚜껑이 없으면) 가리는 것으로 치지 않습니다. 통 벽은 어디서 봐도 레이를 막기 때문입니다.
+    /// </summary>
+    bool IsOccluded(RaycastHit target, int blockerCount)
+    {
+        Vector3 center = target.collider.bounds.center;
+        for (int i = 0; i < blockerCount; i++)
+        {
+            RaycastHit b = blockers[i];
+            if (b.collider == null || b.collider.transform.IsChildOf(transform)) continue;
+            if (b.distance > target.distance - 0.02f) continue; // 대상 뒤에 있음
+
+            if (b.collider.bounds.Contains(center))
+            {
+                // 대상이 이 통 안에 있음: 뚜껑(문 스크립트)이 닫혀 있을 때만 가림
+                MonoBehaviour lid;
+                if (!DoorInteraction.TryGet(b.collider, out lid) || DoorInteraction.IsOpen(lid)) continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// 이동 속도에서 (1) 가는 방향 wallStandoff 안에 있는 표면 쪽 성분을 빼고(미리 멈춤·미끄러짐),
     /// (2) 옆·대각선 wallStandoff 안에 있는 표면에서는 살짝 밀려나는 속도를 더합니다(스칠 때 거리 유지).
     /// 턱 높이(stepOffset) 위부터 검사하므로 낮은 문턱은 그대로 넘습니다. 양쪽이 모두 가까운 문틀에서는 밀어내는 힘이 상쇄돼 그대로 지나갑니다.
@@ -485,7 +509,7 @@ public class FirstPersonController : MonoBehaviour
             RaycastHit hit = hits[i];
             if (hit.collider.transform.IsChildOf(transform)) continue; // 내 몸은 제외
             if (!hit.collider.enabled || hit.distance >= best) continue;
-            if (hit.distance > nearestBlocker + 0.02f) continue; // 가려져 있음
+            if (hit.distance > nearestBlocker + 0.02f && IsOccluded(hit, blockerCount)) continue; // 가려져 있음
             if (viewMode == ViewMode.ThirdPerson && Vector3.Distance(hit.point, reachFrom) > reachDistance) continue;
             if (hit.collider.gameObject.TryGetComponent<ClickableObject>(out var clickable))
             {
