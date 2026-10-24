@@ -93,6 +93,10 @@ public static class CatSpawner
             if (BlockedLine(cell + Vector3.up * 0.9f, catEye, mask) && BlockedLine(cell + Vector3.up * 1.5f, catEye, mask)) continue;
             // 문 바로 옆은 제외: 열린 문짝 뒤에 숨으면 시선이 문에 막혀 "문 닫기"만 뜹니다
             if (NearDoor(spot, mask)) continue;
+            // 고양이 몸 크기 상자가 칸에서 자리까지 들어갈 수 있어야 합니다 (돌아다니는 고양이가 드나들 수 있고, 좁은 틈이 아니라는 뜻)
+            if (CatBoxBlocked(cell, spot, mask)) continue;
+            // 세탁기와 벽 사이처럼 양옆이 바짝 막힌 틈은 제외: 비스듬히 보면 가구에 가려 안을 수 없습니다
+            if (IsSlit(cell, spot, mask)) continue;
 
             candidates.Add(new Spot { position = spot, hiddenFromStart = IsHidden(eye, spot, mask), cover = CoverScore(spot, mask) });
         }
@@ -331,6 +335,27 @@ public static class CatSpawner
             if (!DoorInteraction.IsPassable(lineHits[i].collider)) return true;
         }
         return false;
+    }
+
+    static readonly Vector3 CatHalf = new Vector3(0.2f, 0.16f, 0.2f); // CatNav와 같은 고양이 몸 상자 (바닥 위 0.10~0.42m)
+
+    static bool CatBoxBlocked(Vector3 from, Vector3 to, int mask)
+    {
+        Vector3 d = Flat(to - from);
+        float len = d.magnitude;
+        if (len < 0.01f) return false;
+        return Physics.BoxCast(from + Vector3.up * 0.26f, CatHalf, d / len, out _, Quaternion.identity, len, mask, QueryTriggerInteraction.Ignore);
+    }
+
+    // 칸→자리 방향의 양옆(수직 방향) 0.45m 안이 둘 다 막혀 있으면 좁은 틈
+    static bool IsSlit(Vector3 cell, Vector3 spot, int mask)
+    {
+        Vector3 d = Flat(spot - cell);
+        if (d.sqrMagnitude < 0.01f) return false;
+        Vector3 side = Vector3.Cross(Vector3.up, d.normalized);
+        Vector3 from = spot + Vector3.up * 0.5f;
+        return Physics.Raycast(from, side, 0.45f, mask, QueryTriggerInteraction.Ignore)
+            && Physics.Raycast(from, -side, 0.45f, mask, QueryTriggerInteraction.Ignore);
     }
 
     // 여닫이문·옷장 문·서랍 콜라이더가 0.9m 안에 있는지
