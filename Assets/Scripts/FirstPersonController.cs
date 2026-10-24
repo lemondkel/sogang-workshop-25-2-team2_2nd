@@ -328,36 +328,19 @@ public class FirstPersonController : MonoBehaviour
             verticalVelocity -= gravity * Time.deltaTime;
         }
 
-        // 벽·문 앞에서는 캡슐이 닿기 전에 미리 멈춥니다. 캡슐은 몸 중심 기준이라 걷는 팔·얼굴은 캡슐 밖으로 나오는데,
-        // 캡슐이 벽에 딱 붙으면 그 부분이 벽에 파묻혀 보입니다. (턱 높이 위부터 검사해서 낮은 문턱은 그대로 넘습니다)
-        Vector3 move = planarVelocity;
-        if (move.sqrMagnitude > 1e-4f)
-        {
-            float r = characterController.radius;
-            Vector3 p1 = transform.position + Vector3.up * (characterController.stepOffset + r + 0.02f);
-            Vector3 p2 = transform.position + Vector3.up * Mathf.Max(characterController.height - r, characterController.stepOffset + r + 0.03f);
-            RaycastHit wall;
-            if (Physics.CapsuleCast(p1, p2, r, move.normalized, out wall, wallStandoff + characterController.skinWidth, EnvironmentMask, QueryTriggerInteraction.Ignore))
-            {
-                Vector3 n = wall.normal;
-                n.y = 0f;
-                if (n.sqrMagnitude > 0.01f)
-                {
-                    n.Normalize();
-                    float into = Vector3.Dot(move, n);
-                    if (into < 0f) move -= n * into; // 벽 쪽 성분만 빼고 벽을 따라 미끄러집니다
-                }
-            }
-        }
+        // 벽·문·가구 앞에서는 캡슐이 닿기 전에 미리 멈추고, 옆으로 스칠 때도 일정 거리를 유지합니다.
+        // 캡슐은 몸 중심 기준이라 걷는 팔·다리는 캡슐 밖으로 나오는데, 캡슐이 벽에 딱 붙으면 그 부분이 벽에 파묻혀 보입니다.
+        Vector3 move = ApplyWallStandoff(planarVelocity);
 
         characterController.Move((move + Vector3.up * verticalVelocity) * Time.deltaTime);
 
-        // 캐릭터 몸 방향
+        // 캐릭터 몸 방향: 실제로 가는 방향(벽을 따라 미끄러지면 벽과 나란히)을 봅니다. 그래야 팔다리가 벽 쪽으로 흔들리지 않습니다.
         if (viewMode == ViewMode.ThirdPerson)
         {
-            if (planarVelocity.sqrMagnitude > 0.05f)
+            Vector3 faceDir = move.sqrMagnitude > 0.05f ? move : Vector3.zero;
+            if (faceDir.sqrMagnitude > 0.05f)
             {
-                Quaternion face = Quaternion.LookRotation(planarVelocity.normalized, Vector3.up);
+                Quaternion face = Quaternion.LookRotation(faceDir.normalized, Vector3.up);
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, face, turnSpeed * Time.deltaTime);
             }
         }
@@ -377,6 +360,57 @@ public class FirstPersonController : MonoBehaviour
             // 걷기 애니메이션(약 1.4m/s 기준)을 실제 속도에 맞춰 발이 미끄러지지 않게
             animator.speed = moving ? Mathf.Clamp(actualSpeed / 1.4f, 0.7f, 1.5f) : 1f;
         }
+    }
+
+    /// <summary>
+    /// 이동 속도에서 (1) 가는 방향 wallStandoff 안에 있는 표면 쪽 성분을 빼고(미리 멈춤·미끄러짐),
+    /// (2) 옆·대각선 wallStandoff 안에 있는 표면에서는 살짝 밀려나는 속도를 더합니다(스칠 때 거리 유지).
+    /// 턱 높이(stepOffset) 위부터 검사하므로 낮은 문턱은 그대로 넘습니다. 양쪽이 모두 가까운 문틀에서는 밀어내는 힘이 상쇄돼 그대로 지나갑니다.
+    /// </summary>
+    Vector3 ApplyWallStandoff(Vector3 move)
+    {
+        if (move.sqrMagnitude < 1e-4f) return move;
+
+        float r = characterController.radius;
+        float reach = wallStandoff + characterController.skinWidth;
+        Vector3 p1 = transform.position + Vector3.up * (characterController.stepOffset + r + 0.02f);
+        Vector3 p2 = transform.position + Vector3.up * Mathf.Max(characterController.height - r, characterController.stepOffset + r + 0.03f);
+        int mask = EnvironmentMask;
+
+        Vector3 forward = move.normalized;
+        Vector3 right = Vector3.Cross(Vector3.up, forward);
+        Vector3[] dirs =
+        {
+            forward,
+            (forward + right).normalized, (forward - right).normalized,
+            right, -right,
+        };
+
+        Vector3 push = Vector3.zero;
+        for (int i = 0; i < dirs.Length; i++)
+        {
+            RaycastHit hit;
+            if (!Physics.CapsuleCast(p1, p2, r, dirs[i], out hit, reach, mask, QueryTriggerInteraction.Ignore)) continue;
+            if (hit.collider.transform.IsChildOf(transform)) continue;
+            Vector3 n = hit.normal;
+            n.y = 0f;
+            if (n.sqrMagnitude < 0.01f) continue;
+            n.Normalize();
+
+            // 표면 쪽으로 가는 성분은 뺍니다 (벽을 따라 미끄러짐)
+            float into = Vector3.Dot(move, n);
+            if (into < 0f) move -= n * into;
+
+            // 너무 가까우면 표면 반대쪽으로 조금 밀려납니다
+            float deficit = reach - hit.distance;
+            if (deficit > 0f) push += n * deficit;
+        }
+
+        if (push.sqrMagnitude > 1e-6f)
+        {
+            move += Vector3.ClampMagnitude(push * 8f, 1.0f);
+        }
+        return move;
     }
 
     void UpdateInteraction()
