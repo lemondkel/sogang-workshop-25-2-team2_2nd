@@ -208,6 +208,12 @@ public class GameManager : MonoBehaviour
                 go.name = "Cat_" + t.catName;
             }
             cats.Add(cat);
+
+            // 직접 지정한 자리(예: 1단계 빨래통 속)의 고양이는 그대로 두고, 나머지는 집 안을 돌아다니게 합니다.
+            if (Level.catsWander && i >= preferred.Count && player != null)
+            {
+                cat.EnableWander(CatSpawner.LastCandidates, player.transform, Level.minCover);
+            }
         }
 
         CatsTotal = Mathf.Min(targetCount, spots.Count);
@@ -262,6 +268,7 @@ public class GameManager : MonoBehaviour
             return;
         }
         if (cat.found) return;
+        if (player != null && player.IsHugging) return; // 안아주는 중에는 다른 고양이를 잡지 않습니다
 
         if (cat.isDecoy)
         {
@@ -285,16 +292,26 @@ public class GameManager : MonoBehaviour
         cat.PlayFound();
         UIKit.PlayOneShot(LevelDatabase.Load().successClip, 0.7f);
 
-        if (remainingObjectCount == 0)
+        // 안아주기: 플레이어가 팔을 뻗어 고양이를 품에 안고 잠시 있다가, 고양이가 반짝 사라집니다.
+        float hold = player != null ? player.BeginHug(cat) : 0f;
+        bool last = remainingObjectCount == 0;
+        if (last)
         {
             Debug.Log("모든 고양이를 찾았습니다!");
             hud.Toast($"{cat.catName} 찾았다!", UIKit.Green);
-            StartCoroutine(EndLevelAfter(1.0f, true));
         }
         else
         {
             hud.Toast($"{cat.catName} 찾았다! (남은 고양이 {remainingObjectCount})", UIKit.Green);
         }
+        StartCoroutine(FinishFound(cat, hold, last));
+    }
+
+    IEnumerator FinishFound(HiddenCat cat, float hold, bool last)
+    {
+        if (hold > 0f) yield return new WaitForSeconds(hold);
+        if (cat != null) cat.PlayPopAndHide();
+        if (last) StartCoroutine(EndLevelAfter(0.9f, true));
     }
 
     public void OnObjectClickedQuest(GameObject clickedObject, int questIndex)

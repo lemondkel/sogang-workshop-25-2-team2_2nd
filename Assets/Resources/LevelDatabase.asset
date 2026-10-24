@@ -34,6 +34,7 @@ MonoBehaviour:
     hiddenRatio: 0
     parTime: 60
     hintArrow: 1
+    catsWander: 0
     minCover: 0
     fixedSpawnPositions: []
   - title: "\uD131\uC2DC\uC758 \uC228\uBC14\uAF2D\uC9C8"
@@ -48,6 +49,7 @@ MonoBehaviour:
     hiddenRatio: 1
     parTime: 60
     hintArrow: 1
+    catsWander: 1
     minCover: 3
     fixedSpawnPositions: []
   - title: "\uBBF8\uBBF8\uC640 \uC5EC\uB984"
@@ -64,6 +66,7 @@ MonoBehaviour:
     hiddenRatio: 1
     parTime: 90
     hintArrow: 1
+    catsWander: 1
     minCover: 3
     fixedSpawnPositions: []
   - title: "\uC606\uC9D1 \uACE0\uC591\uC774 \uC8FC\uC758!"
@@ -78,6 +81,7 @@ MonoBehaviour:
     hiddenRatio: 1
     parTime: 90
     hintArrow: 0
+    catsWander: 1
     minCover: 4
     fixedSpawnPositions: []
   - title: "\uBAA8\uB450 \uBAA8\uC5EC\uB77C!"
@@ -98,6 +102,7 @@ MonoBehaviour:
     hiddenRatio: 1
     parTime: 150
     hintArrow: 0
+    catsWander: 1
     minCover: 4
     fixedSpawnPositions: []
   clues:

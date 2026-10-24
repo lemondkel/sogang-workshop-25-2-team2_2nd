@@ -101,6 +101,18 @@ public class FirstPersonController : MonoBehaviour
     private SkinnedMeshRenderer[] bodyRenderers;
     private Camera camera3d;
 
+    // 안아주기: 고양이를 찾으면 잠시 조작을 멈추고 팔을 뻗어 고양이를 품에 안습니다.
+    private HiddenCat hugCat;
+    private float hugTime;
+    private Vector3 hugStartPos;
+    private Quaternion hugStartRot;
+    private float hugZoom;                   // 0 평소 ~ 1 안아주는 중 (3인칭 카메라가 앞쪽으로 돌아 가까이 옵니다)
+    private const float HugReachEnd = 0.45f; // 손을 뻗는 시간
+    private const float HugLiftEnd = 1.0f;   // 고양이가 품에 들어오는 시간
+    private const float HugDuration = 2.8f;  // 전체 길이
+    public bool IsHugging { get { return hugCat != null; } }
+    public bool IsCrouching { get { return isCrouching; } }
+
     int EnvironmentMask
     {
         get
@@ -259,9 +271,114 @@ public class FirstPersonController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.V)) ToggleView();
 
         UpdateLook();
+        if (IsHugging)
+        {
+            UpdateHug();
+            return;
+        }
         UpdateCrouch();
         UpdateMove();
         UpdateInteraction();
+    }
+
+    // ===== 안아주기 =====
+
+    /// <summary>고양이를 안아 주는 동작을 시작합니다. 동작이 끝나는 데 걸리는 시간(초)을 돌려줍니다.</summary>
+    public float BeginHug(HiddenCat cat)
+    {
+        if (cat == null) return 0f;
+        hugCat = cat;
+        hugTime = 0f;
+        hugStartPos = cat.transform.position;
+        hugStartRot = cat.transform.rotation;
+        planarVelocity = Vector3.zero;
+        standoffPushSmoothed = Vector3.zero;
+        if (animator != null) { animator.SetBool("IsWalking", false); animator.speed = 1f; }
+        if (GameManager.Instance != null)
+        {
+            if (GameManager.Instance.Hud != null) GameManager.Instance.Hud.SetInteractPrompt(null);
+            GameManager.Instance.SetCrosshairVisuals(false);
+        }
+        return HugDuration;
+    }
+
+    void UpdateHug()
+    {
+        hugTime += Time.deltaTime;
+        // 서 있기만 하되 중력은 받습니다
+        if (characterController.isGrounded) verticalVelocity = -2f;
+        else verticalVelocity -= gravity * Time.deltaTime;
+        characterController.Move(Vector3.up * verticalVelocity * Time.deltaTime);
+
+        // 고양이 쪽으로 몸을 돌립니다
+        Vector3 toCat = hugStartPos - transform.position;
+        toCat.y = 0f;
+        if (toCat.sqrMagnitude > 0.01f)
+        {
+            Quaternion face = Quaternion.LookRotation(toCat.normalized, Vector3.up);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, face, turnSpeed * Time.deltaTime);
+        }
+        if (animator != null) animator.SetBool("IsWalking", false);
+
+        if (hugTime >= HugDuration || hugCat == null) hugCat = null;
+    }
+
+    /// <summary>
+    /// LateUpdate에서 애니메이션 위에 덮어씁니다: 두 손을 고양이에게 뻗고, 고양이는 품(가슴 앞)으로 들어와 얌전히 안깁니다.
+    /// 플레이어 모델에는 안는 동작 클립이 없어서 팔 IK로 만듭니다.
+    /// </summary>
+    void ApplyHugPose()
+    {
+        if (hugCat == null) return;
+        Vector3 forward = transform.forward;
+        Vector3 right = transform.right;
+        float chestHeight = Mathf.Lerp(1.12f, 1.12f - crouchHipsDrop, crouchBlend);
+        Vector3 chest = transform.position + Vector3.up * chestHeight + forward * 0.34f;
+        if (viewMode == ViewMode.FirstPerson)
+        {
+            // 1인칭에서는 화면 아래쪽에 고양이가 보이도록 카메라 기준으로 둡니다
+            Quaternion look = Quaternion.Euler(pitch, yaw, 0);
+            chest = cam.position + look * new Vector3(0f, -0.30f, 0.40f);
+            forward = look * Vector3.forward;
+            right = look * Vector3.right;
+        }
+
+        float reach = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(hugTime / HugReachEnd));
+        float lift = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((hugTime - HugReachEnd) / (HugLiftEnd - HugReachEnd)));
+        float settle = Mathf.Clamp01((HugDuration - hugTime) / 0.3f); // 끝날 때 손을 내립니다
+        float bob = hugTime > HugLiftEnd ? Mathf.Sin((hugTime - HugLiftEnd) * 5f) * 0.012f : 0f;
+
+        // 고양이: 제자리 → 품으로 (살짝 위로 포물선을 그리며)
+        Vector3 catPos = Vector3.Lerp(hugStartPos, chest, lift) + Vector3.up * (Mathf.Sin(lift * Mathf.PI) * 0.15f + bob);
+        Quaternion heldRot = Quaternion.LookRotation(forward, Vector3.up) * Quaternion.Euler(-18f, 0f, 0f); // 앞을 보며 살짝 안긴 자세
+        hugCat.transform.SetPositionAndRotation(catPos, Quaternion.Slerp(hugStartRot, heldRot, lift));
+
+        // 두 손: 고양이 양옆을 감싸 쥡니다
+        float weight = reach * settle;
+        Vector3 handCenter = catPos + Vector3.up * 0.08f;
+        Vector3 shoulderCenter = transform.position + Vector3.up * Mathf.Lerp(1.4f, 1.4f - crouchHipsDrop, crouchBlend);
+        if (rightArm != null && rightForeArm != null && rightHand != null)
+        {
+            Vector3 pole = shoulderCenter + right * 0.55f - Vector3.up * 0.45f + forward * 0.15f;
+            WeightedTwoBoneIK(rightArm, rightForeArm, rightHand, handCenter + right * 0.18f, pole, weight);
+        }
+        if (leftArm != null && leftForeArm != null && leftHand != null)
+        {
+            Vector3 pole = shoulderCenter - right * 0.55f - Vector3.up * 0.45f + forward * 0.15f;
+            WeightedTwoBoneIK(leftArm, leftForeArm, leftHand, handCenter - right * 0.18f, pole, weight);
+        }
+    }
+
+    static void WeightedTwoBoneIK(Transform upper, Transform lower, Transform end, Vector3 target, Vector3 pole, float weight)
+    {
+        if (weight <= 0.001f) return;
+        Quaternion upper0 = upper.rotation, lower0 = lower.rotation;
+        TwoBoneIK(upper, lower, end, target, pole);
+        if (weight < 0.999f)
+        {
+            upper.rotation = Quaternion.Slerp(upper0, upper.rotation, weight);
+            lower.rotation = Quaternion.Slerp(lower0, lower.rotation, weight);
+        }
     }
 
     void UpdateCrouch()
@@ -566,6 +683,8 @@ public class FirstPersonController : MonoBehaviour
         RestoreCrouchPose();
         PinHipsToCapsule();
         ApplyCrouchPose();
+        hugZoom = Mathf.MoveTowards(hugZoom, IsHugging ? 1f : 0f, Time.deltaTime * (IsHugging ? 1.6f : 2.5f));
+        if (IsHugging) ApplyHugPose();
         if (viewMode == ViewMode.ThirdPerson) PlaceThirdPersonCamera();
         else PlaceFirstPersonCamera();
 
@@ -666,7 +785,9 @@ public class FirstPersonController : MonoBehaviour
 
     void PlaceThirdPersonCamera()
     {
-        Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
+        // 안아줄 때는 카메라가 캐릭터 오른쪽 앞으로 돌아 들어와 품에 안긴 고양이가 보이게 합니다 (뒤에서는 몸에 가립니다)
+        float orbit = Mathf.SmoothStep(0f, 1f, hugZoom);
+        Quaternion rotation = Quaternion.Euler(Mathf.Lerp(pitch, 18f, orbit), yaw + 70f * orbit, 0);
         int mask = EnvironmentMask;
         RaycastHit hit;
 
@@ -681,7 +802,8 @@ public class FirstPersonController : MonoBehaviour
         }
         Vector3 pivot = center + side * sideLength;
 
-        Vector3 desired = pivot + rotation * new Vector3(shoulderOffset, 0, -cameraDistance);
+        float distance = Mathf.Lerp(cameraDistance, 1.45f, orbit);
+        Vector3 desired = pivot + rotation * new Vector3(shoulderOffset * (1f - orbit), 0, -distance);
         Vector3 dir = desired - pivot;
         float wanted = dir.magnitude;
         dir /= wanted;
@@ -714,6 +836,7 @@ public class FirstPersonController : MonoBehaviour
 
         // 머리는 안 보이게 줄이고(카메라와 겹침 방지), 두 손은 화면 앞으로
         if (head != null) head.localScale = Vector3.one * 0.001f;
+        if (IsHugging) return; // 손은 안아주기 포즈가 이미 잡았습니다
         Vector3 shoulderCenter = transform.position + Vector3.up * 1.4f;
         if (rightArm != null && rightForeArm != null && rightHand != null)
         {

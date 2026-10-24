@@ -51,6 +51,9 @@ public class CatLevel
     [Tooltip("H 힌트에 방향 화살표를 보여줄지. 끄면 야옹 소리만 들립니다.")]
     public bool hintArrow = true;
 
+    [Tooltip("고양이가 숨을 자리 사이를 돌아다니고, 가까이 가면 도망칠지. 직접 지정한 위치(fixedSpawnPositions)의 고양이는 움직이지 않습니다.")]
+    public bool catsWander = true;
+
     [Tooltip("비워두면 집 안에서 숨을 곳을 자동으로 찾습니다. 직접 지정하면 이 위치들을 먼저 사용합니다.")]
     public Vector3[] fixedSpawnPositions = new Vector3[0];
 }

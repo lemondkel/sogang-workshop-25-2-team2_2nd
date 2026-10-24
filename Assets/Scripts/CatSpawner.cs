@@ -41,6 +41,9 @@ public static class CatSpawner
         public int cover; // 주변이 얼마나 가려져 있는지 (0~10)
     }
 
+    /// <summary>마지막 FindSpots에서 찾은 숨을 자리 후보 전부. 고양이가 돌아다닐 때 갈 곳으로 씁니다.</summary>
+    public static List<Spot> LastCandidates { get; private set; } = new List<Spot>();
+
     /// <param name="feet">플레이어 발 위치</param>
     /// <param name="eye">플레이어 눈(카메라) 위치</param>
     public static List<Spot> FindSpots(Vector3 feet, Vector3 eye, int count, float hiddenRatio, IList<Vector3> preferred)
@@ -83,6 +86,7 @@ public static class CatSpawner
 
             candidates.Add(new Spot { position = spot, hiddenFromStart = IsHidden(eye, spot, mask), cover = CoverScore(spot, mask) });
         }
+        LastCandidates = new List<Spot>(candidates);
 
         // 3) 가림 정도(minCover) 이상인 자리 중에서 숨김 비율에 맞춰 선택. 자리가 모자라면 가림 기준을 한 단계씩 낮춥니다.
         int remaining = count - result.Count;
