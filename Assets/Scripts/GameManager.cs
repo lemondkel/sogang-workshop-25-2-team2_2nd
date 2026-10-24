@@ -183,7 +183,7 @@ public class GameManager : MonoBehaviour
         // 자동 탐색 중 플레이어 콜라이더가 방해하지 않도록 잠시 끕니다.
         CharacterController cc = player != null ? player.GetComponent<CharacterController>() : null;
         if (cc != null) cc.enabled = false;
-        List<CatSpawner.Spot> spots = CatSpawner.FindSpots(feet, eye, total, Level.hiddenRatio, preferred);
+        List<CatSpawner.Spot> spots = CatSpawner.FindSpots(feet, eye, total, Level.hiddenRatio, preferred, Level.minCover);
         if (cc != null) cc.enabled = true;
 
         // FindSpots는 지정 위치 → 숨겨진 자리 순으로 돌려주므로, 앞쪽은 진짜 고양이, 뒤쪽은 옆집 고양이가 차지합니다.
@@ -372,7 +372,8 @@ public class GameManager : MonoBehaviour
         HintsLeft--;
         HintsUsed++;
         nearest.Meow();
-        hud.ShowHintArrow(nearest.transform);
+        if (Level.hintArrow) hud.ShowHintArrow(nearest.transform);
+        else hud.Toast("야옹~ 소리가 나는 쪽을 잘 들어보세요", UIKit.BrownLight);
     }
 
     HiddenCat NearestTarget()

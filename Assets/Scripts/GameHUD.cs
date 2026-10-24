@@ -209,7 +209,7 @@ public class GameHUD : MonoBehaviour
     public void ShowHintArrow(Transform target)
     {
         hintTarget = target;
-        hintUntil = Time.unscaledTime + 4f;
+        hintUntil = Time.unscaledTime + 2.5f;
         Toast("야옹~ 소리가 나는 쪽을 찾아보세요!", UIKit.Orange);
     }
 

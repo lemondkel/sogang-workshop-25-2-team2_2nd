@@ -29,10 +29,12 @@ MonoBehaviour:
     - catName: "\uD1A0\uB9AC"
       tint: {r: 0.85, g: 0.78, b: 0.68, a: 1}
     decoyCount: 0
-    timeLimit: 0
-    hintCount: 3
+    timeLimit: 150
+    hintCount: 2
     hiddenRatio: 0
     parTime: 60
+    hintArrow: 1
+    minCover: 0
     fixedSpawnPositions: []
   - title: "\uD131\uC2DC\uC758 \uC228\uBC14\uAF2D\uC9C8"
     description: "\uC228\uBC14\uAF2D\uC9C8 \uC7A5\uC778 \uD131\uC2DC! \uC2DC\uC791 \uC790\uB9AC\uC5D0\uC11C\uB294 \uC808\uB300 \uC548 \uBCF4\uC774\uB294 \uACF3\uC5D0 \uC228\uC5C8\uC5B4\uC694."
@@ -41,10 +43,12 @@ MonoBehaviour:
     - catName: "\uD131\uC2DC"
       tint: {r: 0.3, g: 0.3, b: 0.33, a: 1}
     decoyCount: 0
-    timeLimit: 180
-    hintCount: 2
+    timeLimit: 120
+    hintCount: 1
     hiddenRatio: 1
     parTime: 60
+    hintArrow: 1
+    minCover: 3
     fixedSpawnPositions: []
   - title: "\uBBF8\uBBF8\uC640 \uC5EC\uB984"
     description: "\uB298 \uBD99\uC5B4 \uB2E4\uB2C8\uB358 \uBBF8\uBBF8\uC640 \uC5EC\uB984\uAC00 \uB530\uB85C\uB530\uB85C \uC228\uC5C8\uC5B4\uC694. \uC5B4\uB450\uC6B4 \uAD6C\uC11D\uB3C4 \uC798 \uC0B4\uD3B4\uBCF4\uC138\uC694."
@@ -54,11 +58,13 @@ MonoBehaviour:
       tint: {r: 0.13, g: 0.13, b: 0.15, a: 1}
     - catName: "\uC5EC\uB984"
       tint: {r: 1, g: 0.9, b: 0.7, a: 1}
-    decoyCount: 0
-    timeLimit: 240
-    hintCount: 2
-    hiddenRatio: 0.5
-    parTime: 120
+    decoyCount: 1
+    timeLimit: 150
+    hintCount: 1
+    hiddenRatio: 1
+    parTime: 90
+    hintArrow: 1
+    minCover: 3
     fixedSpawnPositions: []
   - title: "\uC606\uC9D1 \uACE0\uC591\uC774 \uC8FC\uC758!"
     description: "\uC606\uC9D1 \uACE0\uC591\uC774\uB4E4\uC774 \uB180\uB7EC \uC654\uC5B4\uC694. \uC0AC\uC9C4 \uC18D \uD1A0\uB9AC\uB9CC \uACE8\uB77C\uB0B4\uC138\uC694!"
@@ -66,11 +72,13 @@ MonoBehaviour:
     targets:
     - catName: "\uD1A0\uB9AC"
       tint: {r: 0.85, g: 0.78, b: 0.68, a: 1}
-    decoyCount: 2
-    timeLimit: 180
-    hintCount: 2
+    decoyCount: 3
+    timeLimit: 150
+    hintCount: 1
     hiddenRatio: 1
     parTime: 90
+    hintArrow: 0
+    minCover: 4
     fixedSpawnPositions: []
   - title: "\uBAA8\uB450 \uBAA8\uC5EC\uB77C!"
     description: "\uB9C8\uC9C0\uB9C9 \uB808\uBCA8! \uC9D1 \uC548 \uACF3\uACF3\uC5D0 \uC228\uC740 \uACE0\uC591\uC774 \uB124 \uB9C8\uB9AC\uB97C \uBAA8\uB450 \uCC3E\uC544 \uAF2D \uC548\uC544\uC8FC\uC138\uC694."
@@ -84,11 +92,13 @@ MonoBehaviour:
       tint: {r: 0.13, g: 0.13, b: 0.15, a: 1}
     - catName: "\uC5EC\uB984"
       tint: {r: 1, g: 0.9, b: 0.7, a: 1}
-    decoyCount: 2
-    timeLimit: 300
+    decoyCount: 3
+    timeLimit: 240
     hintCount: 1
     hiddenRatio: 1
-    parTime: 200
+    parTime: 150
+    hintArrow: 0
+    minCover: 4
     fixedSpawnPositions: []
   clues:
   - text: "\uACE0\uC591\uC774\uB294 \uC65C \uC774\uB807\uAC8C \uC4F0\uB808\uAE30\uB97C \uC88B\uC544\uD560\uAE4C..?"
@@ -103,4 +113,4 @@ MonoBehaviour:
     image: {fileID: 2800000, guid: baafbda51234a4b8b9260089ddddfe71, type: 3}
   decoyName: "\uC606\uC9D1 \uACE0\uC591\uC774"
   decoyTint: {r: 0.55, g: 0.62, b: 0.8, a: 1}
-  decoyPenaltySeconds: 15
+  decoyPenaltySeconds: 20

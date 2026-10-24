@@ -44,6 +44,13 @@ public class CatLevel
     [Tooltip("별 3개를 받기 위한 목표 시간(초)")]
     public float parTime = 60f;
 
+    [Tooltip("숨는 자리의 가림 정도(0~8). 고양이 주변 8방향 1m 안에 가구·벽이 몇 개나 있는지. 높을수록 가구 밑/구석처럼 보기 어려운 곳에만 숨깁니다. (위가 막혀 있으면 +2)")]
+    [Range(0, 8)]
+    public int minCover = 0;
+
+    [Tooltip("H 힌트에 방향 화살표를 보여줄지. 끄면 야옹 소리만 들립니다.")]
+    public bool hintArrow = true;
+
     [Tooltip("비워두면 집 안에서 숨을 곳을 자동으로 찾습니다. 직접 지정하면 이 위치들을 먼저 사용합니다.")]
     public Vector3[] fixedSpawnPositions = new Vector3[0];
 }

@@ -12,7 +12,7 @@ public static class CatSpawner
 {
     const float CellSize = 0.5f;
     const float SearchRadius = 18f;
-    const float MinDistanceFromPlayer = 2.5f;
+    const float MinDistanceFromPlayer = 4.0f;
     const float MinDistanceBetweenCats = 2.2f;
 
     // 고양이(Clickable), UI, 퀘스트 레이어, Ignore Raycast는 지형 판정에서 제외
@@ -38,11 +38,18 @@ public static class CatSpawner
     {
         public Vector3 position;
         public bool hiddenFromStart;
+        public int cover; // 주변이 얼마나 가려져 있는지 (0~10)
     }
 
     /// <param name="feet">플레이어 발 위치</param>
     /// <param name="eye">플레이어 눈(카메라) 위치</param>
     public static List<Spot> FindSpots(Vector3 feet, Vector3 eye, int count, float hiddenRatio, IList<Vector3> preferred)
+    {
+        return FindSpots(feet, eye, count, hiddenRatio, preferred, 0);
+    }
+
+    /// <param name="minCover">숨는 자리의 최소 가림 정도(0~8). 부족하면 한 단계씩 낮춰서 다시 고릅니다.</param>
+    public static List<Spot> FindSpots(Vector3 feet, Vector3 eye, int count, float hiddenRatio, IList<Vector3> preferred, int minCover)
     {
         int mask = EnvironmentMask;
         List<Spot> result = new List<Spot>();
@@ -74,17 +81,20 @@ public static class CatSpawner
             if (!TryFindSurface(sample, feet.y, mask, out spot)) continue;
             if (Flat(spot - feet).magnitude < MinDistanceFromPlayer) continue;
 
-            candidates.Add(new Spot { position = spot, hiddenFromStart = IsHidden(eye, spot, mask) });
+            candidates.Add(new Spot { position = spot, hiddenFromStart = IsHidden(eye, spot, mask), cover = CoverScore(spot, mask) });
         }
 
-        // 3) 숨김 비율에 맞춰 선택
+        // 3) 가림 정도(minCover) 이상인 자리 중에서 숨김 비율에 맞춰 선택. 자리가 모자라면 가림 기준을 한 단계씩 낮춥니다.
         int remaining = count - result.Count;
         int wantHidden = Mathf.RoundToInt(remaining * Mathf.Clamp01(hiddenRatio));
         Shuffle(candidates);
 
-        PickFrom(candidates, result, wantHidden, true);
-        PickFrom(candidates, result, count - result.Count, false);
-        PickFrom(candidates, result, count - result.Count, null);
+        for (int cover = Mathf.Clamp(minCover, 0, 8); cover >= 0 && result.Count < count; cover--)
+        {
+            PickFrom(candidates, result, wantHidden - CountHidden(result), true, MinDistanceBetweenCats, cover);
+            PickFrom(candidates, result, count - result.Count, false, MinDistanceBetweenCats, cover);
+            PickFrom(candidates, result, count - result.Count, null, MinDistanceBetweenCats, cover);
+        }
 
         // 4) 그래도 부족하면(작은 방 등) 고양이 사이 간격을 조금씩 줄여서 다시 고릅니다.
         float[] relaxed = { 1.4f, 0.9f, 0.6f };
@@ -156,7 +166,7 @@ public static class CatSpawner
         }
     }
 
-    static void PickFrom(List<Spot> candidates, List<Spot> result, int want, bool? hidden, float minDistance = MinDistanceBetweenCats)
+    static void PickFrom(List<Spot> candidates, List<Spot> result, int want, bool? hidden, float minDistance = MinDistanceBetweenCats, int minCover = 0)
     {
         if (want <= 0) return;
         int picked = 0;
@@ -164,10 +174,35 @@ public static class CatSpawner
         {
             if (picked >= want) break;
             if (hidden.HasValue && c.hiddenFromStart != hidden.Value) continue;
+            if (c.cover < minCover) continue;
             if (TooClose(c.position, result, minDistance)) continue;
             result.Add(c);
             picked++;
         }
+    }
+
+    static int CountHidden(List<Spot> spots)
+    {
+        int n = 0;
+        foreach (Spot s in spots) if (s.hiddenFromStart) n++;
+        return n;
+    }
+
+    /// <summary>
+    /// 자리 주변 8방향(고양이 눈높이 0.3m, 1m 안)에 벽·가구가 몇 개 있는지 + 위(0.55m에서 1.2m 안)가 막혀 있으면 +2.
+    /// 구석·가구 밑·선반 안쪽일수록 높습니다 (최대 10).
+    /// </summary>
+    public static int CoverScore(Vector3 spot, int mask)
+    {
+        int score = 0;
+        Vector3 from = spot + Vector3.up * 0.3f;
+        for (int i = 0; i < 8; i++)
+        {
+            Vector3 dir = Quaternion.Euler(0, i * 45f, 0) * Vector3.forward;
+            if (Physics.Raycast(from, dir, 1.0f, mask, QueryTriggerInteraction.Ignore)) score++;
+        }
+        if (Physics.Raycast(spot + Vector3.up * 0.55f, Vector3.up, 1.2f, mask, QueryTriggerInteraction.Ignore)) score += 2;
+        return score;
     }
 
     static bool TooClose(Vector3 p, List<Spot> chosen, float minDistance = MinDistanceBetweenCats)
@@ -194,11 +229,11 @@ public static class CatSpawner
         float height = hit.point.y - floorY;
         if (height < -0.5f || height > 1.6f) return false;
 
-        // 고양이가 들어갈 공간이 있는지 (몸통 구: 반지름 0.3, 중심 높이 0.2 → 여유를 두고 0.36)
-        Vector3 center = hit.point + Vector3.up * 0.4f;
-        if (Physics.CheckBox(center, new Vector3(0.28f, 0.25f, 0.28f), Quaternion.identity, mask, QueryTriggerInteraction.Ignore)) return false;
-        // 바닥에 닿지 않도록 바닥에서 8cm 띄운 캡슐(높이 0.08~0.78)로 옆 여유만 봅니다.
-        if (Physics.CheckCapsule(hit.point + Vector3.up * 0.42f, hit.point + Vector3.up * 0.44f, 0.34f, mask, QueryTriggerInteraction.Ignore)) return false;
+        // 고양이가 들어갈 공간이 있는지 (웅크린 고양이 높이 약 0.5m). 침대·책상 밑처럼 낮은 틈에도 숨을 수 있게 0.1~0.5m만 봅니다.
+        Vector3 center = hit.point + Vector3.up * 0.3f;
+        if (Physics.CheckBox(center, new Vector3(0.24f, 0.2f, 0.24f), Quaternion.identity, mask, QueryTriggerInteraction.Ignore)) return false;
+        // 바닥에 닿지 않도록 바닥에서 3cm 띄운 캡슐(높이 0.03~0.53)로 옆 여유를 봅니다.
+        if (Physics.CheckCapsule(hit.point + Vector3.up * 0.28f, hit.point + Vector3.up * 0.29f, 0.25f, mask, QueryTriggerInteraction.Ignore)) return false;
 
         // 실내인지 (위에 천장이 있어야 함)
         if (!Physics.Raycast(hit.point + Vector3.up * 0.2f, Vector3.up, 6f, mask, QueryTriggerInteraction.Ignore)) return false;

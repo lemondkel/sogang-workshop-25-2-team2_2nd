@@ -513,6 +513,8 @@ public class FirstPersonController : MonoBehaviour
             if (viewMode == ViewMode.ThirdPerson && Vector3.Distance(hit.point, reachFrom) > reachDistance) continue;
             if (hit.collider.gameObject.TryGetComponent<ClickableObject>(out var clickable))
             {
+                // 고양이는 가까이(2m) 가야 안아줄 수 있습니다. 멀리서 커서만 훑어 찾는 것을 막습니다.
+                if (clickable.GetComponent<HiddenCat>() != null && Vector3.Distance(hit.point, reachFrom) > 2.0f) continue;
                 best = hit.distance;
                 target = clickable;
             }
