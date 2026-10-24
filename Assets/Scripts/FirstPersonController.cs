@@ -487,6 +487,18 @@ public class FirstPersonController : MonoBehaviour
                 : nearestBlockerHit.distance <= raycastHitDistance;
             if (!inReach) door = null;
         }
+        // 3인칭에서는 조준점이 캐릭터 옆으로 비껴 있어 문 바로 앞에 서면 조준점이 문틀 옆 벽에 놓이기 쉽습니다.
+        // 시선에 문이 없으면 캐릭터 가슴 높이에서 몸이 향한 방향으로 짧게 훑어 바로 앞의 문을 잡습니다.
+        if (target == null && door == null)
+        {
+            Vector3 bodyForward = viewMode == ViewMode.ThirdPerson ? transform.forward : Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized;
+            RaycastHit front;
+            if (Physics.SphereCast(transform.position + Vector3.up * 1.1f, 0.25f, bodyForward, out front, wallStandoff + 0.8f, EnvironmentMask, QueryTriggerInteraction.Ignore)
+                && !front.collider.transform.IsChildOf(transform))
+            {
+                DoorInteraction.TryGet(front.collider, out door);
+            }
+        }
 
         // 화면 아래 "E 안아주기" 안내 (옆집 고양이가 들통나지 않도록 이름은 쓰지 않습니다)
         string label = null;
@@ -532,6 +544,11 @@ public class FirstPersonController : MonoBehaviour
         Vector3 local = transform.InverseTransformPoint(hips.position);
         // 높이는 걷기 들썩임(몇 cm)만 허용합니다. 클립/전환에 따라 엉덩이 높이가 조금씩 내려가 하체가 바닥에 파묻히는 것을 막습니다.
         float bob = Mathf.Clamp(local.y - hipsIdleLocal.y, -0.05f, 0.05f);
+        // 멈춰 있을 때는(대기 클립은 엉덩이 높이를 쓰지 않아 마지막 걷기 프레임 높이가 남음) 원래 높이로 천천히 되돌립니다.
+        if (animator == null || !animator.GetBool("IsWalking"))
+        {
+            bob = Mathf.MoveTowards(bob, 0f, 0.25f * Time.deltaTime);
+        }
         Vector3 pinned = new Vector3(hipsIdleLocal.x, hipsIdleLocal.y + bob, hipsIdleLocal.z);
         if ((local - pinned).sqrMagnitude < 1e-8f) return;
         hips.position = transform.TransformPoint(pinned);
