@@ -244,10 +244,8 @@ public class HiddenCat : MonoBehaviour
         }
         Vector3 dir = to / dist;
 
-        // 바로 앞이 막혔으면(문이 닫혔거나 플레이어가 서 있으면) 거기서 멈춥니다
-        RaycastHit ahead;
-        if (Physics.SphereCast(transform.position + Vector3.up * 0.25f, 0.14f, dir, out ahead, 0.35f, mask, QueryTriggerInteraction.Ignore)
-            && !ahead.collider.transform.IsChildOf(transform))
+        // 바로 앞이 막혔으면(문이 닫혔거나 플레이어가 서 있으면) 거기서 멈춥니다 (길찾기와 같은 몸 크기 상자로 확인)
+        if (CatNav.Blocked(transform.position, dir, Mathf.Min(0.3f, dist)))
         {
             Arrive();
             return;

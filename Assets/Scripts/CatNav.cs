@@ -8,8 +8,9 @@ using UnityEngine;
 public static class CatNav
 {
     const float CellSize = 0.5f;
-    const float CatHeight = 0.25f;  // 캐스트 높이 (고양이 몸통 중심)
-    const float CatRadius = 0.14f;
+    // 고양이 몸 크기의 상자(바닥 위 0.04~0.42m, 좌우 ±0.2m)로 캐스트합니다. 콜라이더(반지름 0.22m)와 거의 같아서 다리·가구 밑면에 걸치지 않습니다.
+    static readonly Vector3 CatHalf = new Vector3(0.2f, 0.19f, 0.2f);
+    const float CatCenterHeight = 0.23f;
 
     static List<Vector3> cells;
     static Dictionary<Vector2Int, int> index;
@@ -59,7 +60,13 @@ public static class CatNav
         d.y = 0f;
         float len = d.magnitude;
         if (len < 0.01f) return true;
-        return !Physics.SphereCast(a + Vector3.up * CatHeight, CatRadius, d / len, out _, len, mask, QueryTriggerInteraction.Ignore);
+        return !Blocked(a, d / len, len);
+    }
+
+    /// <summary>from에서 dir 방향으로 length만큼 고양이 몸 상자를 밀었을 때 가구·벽·닫힌 문에 닿는지.</summary>
+    public static bool Blocked(Vector3 from, Vector3 dir, float length)
+    {
+        return Physics.BoxCast(from + Vector3.up * CatCenterHeight, CatHalf, dir, out _, Quaternion.identity, length, mask, QueryTriggerInteraction.Ignore);
     }
 
     static int Nearest(Vector3 p)
