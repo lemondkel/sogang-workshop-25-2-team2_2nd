@@ -720,7 +720,12 @@ public class FirstPersonController : MonoBehaviour
 
         // 조준점이 세탁기·수납장 같은 가구에 놓여도, 그 옆에 붙어 있는 고양이가 캐릭터 눈에서 보이고 화면 가운데 가까이 있으면 안아줄 수 있습니다.
         // (3인칭 카메라는 몸 뒤에 있어서 가구 옆 고양이가 카메라에서는 가려지는 일이 잦습니다)
-        if (target == null) target = FindCatNearAim(reachFrom);
+        // 세탁기처럼 단서(살펴보기)인 가구 옆에 고양이가 있으면 고양이를 먼저 잡습니다 (단서는 언제든 다시 볼 수 있습니다).
+        if (target == null || target.GetComponent<HiddenCat>() == null)
+        {
+            ClickableObject cat = FindCatNearAim(reachFrom);
+            if (cat != null) target = cat;
+        }
 
         // 고양이/단서가 없으면 시선 끝의 문·서랍을 봅니다
         MonoBehaviour door = null;
