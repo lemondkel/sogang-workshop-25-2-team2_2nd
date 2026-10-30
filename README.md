@@ -46,6 +46,12 @@
 
 WASD·↑↓ 걷기 · 마우스·←→ 둘러보기 · E 상호작용(고양이 안아주기·단서 살펴보기·문/서랍 여닫기, 화면 아래 [E] 안내가 뜰 때) · Space 점프 · Ctrl 앉기(살금살금 다가가면 고양이가 덜 눈치챕니다) · H 힌트 · V 시점 전환 · ESC/P 일시정지
 
+## 웹으로 직접 열기 (PC에서 5173 포트)
+
+1. Unity 메뉴 **CatGame → Build WebGL** (또는 `Unity.exe -batchmode -quit -projectPath . -executeMethod WebGLBuild.Build`) → `Build/WebGL` 생성
+2. `python Tools/serve_webgl.py` → http://localhost:5173/ . 같은 네트워크의 다른 기기는 `http://<PC IP>:5173/` (Windows 방화벽에서 5173 인바운드 허용 필요)
+3. 인터넷에서 접속하려면 공유기에서 5173 포트를 이 PC로 포워딩하거나, cloudflared/ngrok 같은 터널을 쓰세요.
+
 ## 웹 배포 (GitHub Pages)
 
 `.github/workflows/deploy-webgl.yml`이 `main`에 push될 때마다 WebGL로 빌드해서 GitHub Pages에 올립니다.
