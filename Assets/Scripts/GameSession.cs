@@ -51,9 +51,28 @@ public static class GameSession
         set { PlayerPrefs.SetInt(Prefix + "invertY", value ? 1 : 0); PlayerPrefs.Save(); }
     }
 
+    // 자동 테스트(스크린샷 투어 등)를 `-nosound` 인자로 실행하면 소리를 완전히 끕니다.
+    public static bool NoSound
+    {
+        get
+        {
+            foreach (string a in System.Environment.GetCommandLineArgs())
+            {
+                if (a == "-nosound") return true;
+            }
+            return false;
+        }
+    }
+
     public static void ApplySettings()
     {
-        AudioListener.volume = MasterVolume;
+        AudioListener.volume = NoSound ? 0f : MasterVolume;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    static void ApplyOnLoad()
+    {
+        if (NoSound) AudioListener.volume = 0f;
     }
 
     // ===== 진행도 / 기록 =====
