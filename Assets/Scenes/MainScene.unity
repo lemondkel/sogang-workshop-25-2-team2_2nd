@@ -880,7 +880,7 @@ MonoBehaviour:
   raycastHitDistance: 3
   clickableLayerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 1992
 --- !u!1001 &301371954
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -8,6 +8,7 @@ public class ClickableObject : MonoBehaviour, IPointerEnterHandler, IPointerExit
 {
     private Collider objectCollider;
     private bool isClicked = false;
+    private int lastQuestClickFrame = -1;
 
     // 이 오브젝트의 레이어를 미리 가져와 로직에 사용합니다.
     private string myLayerName;
@@ -53,6 +54,15 @@ public class ClickableObject : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     private void OnMouseDown()
     {
+        HandleClick();
+    }
+
+    /// <summary>
+    /// 마우스 클릭(OnMouseDown)과 시선 레이캐스트(FirstPersonController) 양쪽에서 호출됩니다.
+    /// 같은 프레임에 두 번 들어와도 한 번만 처리합니다.
+    /// </summary>
+    public void HandleClick()
+    {
         // 🚨 순환 호출 및 중복 클릭 방지 (가장 중요)
         if (isClicked || GameManager.Instance == null || GameManager.Instance.CurrentGameState != GameManager.GameState.Playing)
         {
@@ -60,7 +70,11 @@ public class ClickableObject : MonoBehaviour, IPointerEnterHandler, IPointerExit
         }
 
         // 클릭 플래그 설정 및 크로스헤어 리셋
-        isClicked = true;
+        // 퀘스트 단서는 여러 번 다시 볼 수 있도록 플래그를 세우지 않습니다.
+        bool isQuest = myLayerName.StartsWith("Quest");
+        if (!isQuest) isClicked = true;
+        else if (Time.frameCount == lastQuestClickFrame) return;
+        lastQuestClickFrame = Time.frameCount;
         GameManager.Instance.SetCrosshairVisuals(false);
 
         // 특정 레이어에 따른 클릭 액션 (예시)
