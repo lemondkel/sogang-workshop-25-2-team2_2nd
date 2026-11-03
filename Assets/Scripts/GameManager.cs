@@ -188,7 +188,11 @@ public class GameManager : MonoBehaviour
         if (!Level.randomStart && !mapChanged) start = seed;
         float yaw = Random.Range(0f, 360f);
         player.Teleport(start, yaw);
-        if (mapChanged) MapLoader.RelocateDecor(walkable, start);
+        if (mapChanged)
+        {
+            MapLoader.RelocateDecor(walkable, start);
+            MapLoader.AttachLamp(player.transform); // 새 집은 조명이 드문 곳이 많아 캐릭터 주변을 비춥니다
+        }
         if (cc != null) cc.enabled = true;
         Debug.Log("[GameManager] 시작 위치 " + start + (mapChanged ? " (맵 " + Level.mapScene + ")" : ""));
     }

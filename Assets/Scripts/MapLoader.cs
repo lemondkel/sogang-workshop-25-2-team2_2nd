@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -19,11 +20,14 @@ public static class MapLoader
 
     public static bool MapLoaded { get; private set; }
     public static Scene MapScene { get; private set; }
+    /// <summary>불러온 집의 실내 조명(점·스팟). 시작 위치를 불 켜진 곳에서 고르는 데 씁니다.</summary>
+    static readonly List<Light> mapLights = new List<Light>();
 
     /// <summary>mapScene을 추가로 불러오고 기본 집을 치웁니다. 실패하면 기본 집을 그대로 둡니다.</summary>
     public static IEnumerator Load(string mapScene)
     {
         MapLoaded = false;
+        mapLights.Clear();
         if (string.IsNullOrEmpty(mapScene)) yield break;
         if (!Application.CanStreamedLevelBeLoaded(mapScene))
         {
@@ -47,9 +51,11 @@ public static class MapLoader
             foreach (Light l in root.GetComponentsInChildren<Light>(true))
             {
                 if (l.type == LightType.Directional) l.enabled = false;
+                else if (l.enabled && l.gameObject.activeInHierarchy) mapLights.Add(l);
             }
             foreach (Canvas cv in root.GetComponentsInChildren<Canvas>(true)) cv.gameObject.SetActive(false);
         }
+        BrightenInterior();
 
         // 기본 집 치우기
         Scene main = SceneManager.GetActiveScene();
@@ -62,6 +68,56 @@ public static class MapLoader
         yield return null;
         Physics.SyncTransforms();
         Debug.Log("[MapLoader] 맵 불러옴: " + mapScene);
+    }
+
+    /// <summary>
+    /// 불러온 집은 여러 층짜리라 햇빛이 안 들어와 실내가 거의 검게 보입니다.
+    /// 환경광을 밝히고, 집에 있는 점·스팟 조명이 여러 개 동시에 픽셀 조명으로 그려지게 합니다.
+    /// </summary>
+    static void BrightenInterior()
+    {
+        RenderSettings.ambientMode = AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = new Color(0.60f, 0.62f, 0.68f);
+        RenderSettings.ambientEquatorColor = new Color(0.46f, 0.46f, 0.48f);
+        RenderSettings.ambientGroundColor = new Color(0.24f, 0.23f, 0.22f);
+        if (QualitySettings.pixelLightCount < 6) QualitySettings.pixelLightCount = 6;
+    }
+
+    /// <summary>캐릭터를 따라다니는 은은한 전등. 조명이 없는 복도·구석에서도 벽과 가구가 보이게 합니다.</summary>
+    public static void AttachLamp(Transform player)
+    {
+        if (player == null || player.Find("PlayerLamp") != null) return;
+        GameObject go = new GameObject("PlayerLamp");
+        go.transform.SetParent(player, false);
+        go.transform.localPosition = new Vector3(0f, 1.8f, 0f);
+        Light lamp = go.AddComponent<Light>();
+        lamp.type = LightType.Point;
+        lamp.range = 9f;
+        lamp.intensity = 0.75f;
+        lamp.color = new Color(1f, 0.96f, 0.88f);
+        lamp.shadows = LightShadows.None;
+    }
+
+    // 그 칸이 집의 조명(같은 층, 범위 안)에 닿는지. 윗층 조명은 천장에 막히므로 높이 차 4.2m까지만 봅니다.
+    static bool IsLit(Vector3 cell)
+    {
+        foreach (Light l in mapLights)
+        {
+            if (l == null) continue;
+            Vector3 lp = l.transform.position;
+            float dy = lp.y - cell.y;
+            if (dy < -0.5f || dy > 4.2f) continue;
+            if ((lp - cell).sqrMagnitude <= l.range * l.range * 0.81f) return true;
+        }
+        return false;
+    }
+
+    static int CountLit(List<Vector3> cells)
+    {
+        if (mapLights.Count == 0) return 0;
+        int n = 0;
+        foreach (Vector3 c in cells) if (IsLit(c)) n++;
+        return n;
     }
 
     /// <summary>
@@ -78,32 +134,47 @@ public static class MapLoader
         }
         if (walkable == null || walkable.Count < 30)
         {
-            Vector3 best = seed;
+            // 집 전체를 훑어 층마다 걸어갈 수 있는 바닥을 찾고, 조명이 닿는 칸이 가장 많은(없으면 가장 넓은) 층을 고릅니다.
+            // 불러온 집은 층이 여러 개라 불 꺼진 층(지하 주차장·맨 위층)에서 시작하면 화면이 거의 검게 보입니다.
             List<Vector3> bestCells = walkable;
+            int bestLit = bestCells != null ? CountLit(bestCells) : -1;
             Bounds area = SceneBounds();
             int tested = 0;
-            for (int i = 0; i < 600 && tested < 10; i++)
+            HashSet<int> seenFloors = new HashSet<int>();
+            for (int i = 0; i < 900 && tested < 14; i++)
             {
                 Vector3 p = new Vector3(Random.Range(area.min.x, area.max.x), 0f, Random.Range(area.min.z, area.max.z));
                 Vector3 floor;
                 if (!FindIndoorFloor(p, area, mask, out floor)) continue;
                 tested++;
                 List<Vector3> cells = CatSpawner.FloodWalkable(floor, mask);
-                if (bestCells == null || cells.Count > bestCells.Count) { bestCells = cells; best = floor; }
-                if (bestCells.Count > 600) break;
+                if (cells.Count < 30) continue;
+                int key = Mathf.RoundToInt(floor.y * 2f);
+                int litCount = CountLit(cells);
+                if (bestCells == null || litCount > bestLit || (litCount == bestLit && cells.Count > bestCells.Count)) { bestCells = cells; bestLit = litCount; }
+                seenFloors.Add(key);
+                if (seenFloors.Count >= 4 && bestLit > 60) break;
             }
             walkable = bestCells ?? new List<Vector3> { seed };
             if (bestCells == null) Debug.LogWarning("[MapLoader] 설 수 있는 바닥을 찾지 못해 기본 위치를 씁니다");
+            else Debug.Log("[MapLoader] 시작 층 y=" + walkable[0].y.ToString("0.0") + " 칸 " + walkable.Count + "개, 조명 닿는 칸 " + bestLit + "개");
         }
 
-        // 벽·가구에서 떨어진 트인 자리(가림 점수 0~1) 중 하나
+        // 벽·가구에서 떨어진 트인 자리(가림 점수 0~2) 중 하나. 조명이 닿는 칸이 있으면 그중에서 고릅니다.
         List<Vector3> open = new List<Vector3>();
+        List<Vector3> lit = new List<Vector3>();
         foreach (Vector3 c in walkable)
         {
-            if (CatSpawner.CoverScore(c, mask) <= 1 && IsStandable(c, mask)) open.Add(c);
+            if (CatSpawner.CoverScore(c, mask) > 2 || !IsStandable(c, mask)) continue;
+            open.Add(c);
+            if (IsLit(c)) lit.Add(c);
         }
-        List<Vector3> pool = open.Count > 0 ? open : walkable;
-        return pool[Random.Range(0, pool.Count)];
+        List<Vector3> pool = lit.Count >= 8 ? lit : (open.Count > 0 ? open : walkable);
+        Vector3 pick = pool[Random.Range(0, pool.Count)];
+        // 칸(0.5m) 안에서 조금 흔들어 매번 똑같은 자리가 아니게
+        Vector2 jitter = Random.insideUnitCircle * 0.15f;
+        Vector3 jittered = new Vector3(pick.x + jitter.x, pick.y, pick.z + jitter.y);
+        return IsStandable(jittered, mask) ? jittered : pick;
     }
 
     static bool IsStandable(Vector3 feet, int mask)
@@ -166,18 +237,33 @@ public static class MapLoader
             else items.Add(root);
         }
 
+        // 콜라이더가 없는 가구(탁자 등)나 이미 옮긴 소품과도 겹치지 않도록 렌더러 경계 상자로도 확인합니다
+        List<Bounds> occupied = new List<Bounds>();
+        if (MapScene.IsValid() && MapScene.isLoaded)
+        {
+            foreach (GameObject root in MapScene.GetRootGameObjects())
+            {
+                foreach (Renderer r in root.GetComponentsInChildren<Renderer>())
+                {
+                    Bounds rb = r.bounds;
+                    if (rb.size.magnitude > 6f || rb.size.y < 0.15f) continue; // 벽 덩어리·바닥·천장은 제외 (콜라이더가 처리)
+                    occupied.Add(rb);
+                }
+            }
+        }
+
         int moved = 0, hidden = 0;
         foreach (GameObject go in items)
         {
             if (!go.activeInHierarchy) continue;
-            if (Place(go, walkable, playerStart)) moved++;
+            if (Place(go, walkable, playerStart, occupied)) moved++;
             else { go.SetActive(false); hidden++; }
         }
         Physics.SyncTransforms();
         Debug.Log("[MapLoader] 소품 옮김 " + moved + "개, 자리 없어 숨김 " + hidden + "개");
     }
 
-    static bool Place(GameObject go, List<Vector3> walkable, Vector3 playerStart)
+    static bool Place(GameObject go, List<Vector3> walkable, Vector3 playerStart, List<Bounds> occupied)
     {
         Renderer[] rs = go.GetComponentsInChildren<Renderer>();
         if (rs.Length == 0) return false;
@@ -203,11 +289,24 @@ public static class MapLoader
 
             Vector3 center = hit.point + Vector3.up * (size.y * 0.5f + 0.02f);
             if (Physics.CheckBox(center, size * 0.5f * 0.95f, Quaternion.identity, mask, QueryTriggerInteraction.Ignore)) continue;
+            // 경계 상자(80%)끼리도 겹치지 않게. 바닥에서 조금 띄워 올려놓은 가구 표면과는 닿아도 됩니다.
+            Bounds nb = new Bounds(center + Vector3.up * (size.y * 0.1f), size * 0.8f);
+            if (Overlaps(nb, occupied)) continue;
 
             // 바닥에 닿게: 바운드의 바닥 중심을 hit.point로
             Vector3 anchor = new Vector3(b.center.x, b.min.y, b.center.z);
             go.transform.position += hit.point + Vector3.up * 0.01f - anchor;
+            occupied.Add(new Bounds(center, size));
             return true;
+        }
+        return false;
+    }
+
+    static bool Overlaps(Bounds b, List<Bounds> occupied)
+    {
+        for (int i = 0; i < occupied.Count; i++)
+        {
+            if (occupied[i].Intersects(b)) return true;
         }
         return false;
     }

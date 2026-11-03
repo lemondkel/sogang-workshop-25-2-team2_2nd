@@ -41,8 +41,8 @@ public static class FurnitureColliders
             if (IsExterior(renderer.transform)) continue;
             int bigAxes = (worldSize.x > 2f ? 1 : 0) + (worldSize.y > 2f ? 1 : 0) + (worldSize.z > 2f ? 1 : 0);
             if (bigAxes >= 2) continue;
-            // 머리 위(천장 조명 등)는 부딪힐 일이 없습니다.
-            if (renderer.bounds.min.y > 2.0f) continue;
+            // 머리 위(천장 조명 등)는 부딪힐 일이 없습니다. 여러 층짜리 집도 있으니 그 층 바닥 기준으로 잽니다.
+            if (renderer.bounds.min.y - FloorBelow(renderer.bounds) > 2.0f) continue;
 
             // 좌우 반전(음수 스케일)된 오브젝트는 BoxCollider가 경고를 내므로 건너뜁니다.
             Vector3 ls = renderer.transform.lossyScale;
@@ -92,6 +92,16 @@ public static class FurnitureColliders
             fixedCount++;
         }
         return fixedCount;
+    }
+
+    // 가구 바로 아래 바닥 높이 (없으면 0층으로 봅니다)
+    static float FloorBelow(Bounds b)
+    {
+        RaycastHit hit;
+        Vector3 from = new Vector3(b.center.x, b.min.y + 0.05f, b.center.z);
+        int mask = Physics.DefaultRaycastLayers & ~(1 << 2) & ~(1 << 5);
+        if (Physics.Raycast(from, Vector3.down, out hit, 6f, mask, QueryTriggerInteraction.Ignore)) return hit.point.y;
+        return 0f;
     }
 
     static bool IsExterior(Transform t)
