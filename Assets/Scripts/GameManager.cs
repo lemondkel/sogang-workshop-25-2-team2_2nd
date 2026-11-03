@@ -134,6 +134,12 @@ public class GameManager : MonoBehaviour
     Vector3 startPosition;
     float startYaw;
     bool hasStart;
+    float outsideTime;
+
+    static bool HasCeiling(Vector3 feet)
+    {
+        return Physics.Raycast(feet + Vector3.up * 0.3f, Vector3.up, 8f, CatSpawner.EnvironmentMask, QueryTriggerInteraction.Ignore);
+    }
 
     void OnDestroy()
     {
@@ -155,12 +161,19 @@ public class GameManager : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.H)) UseHint();
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)) Pause();
 
-            // 집 밖으로 떨어지면(시작 층보다 3m 아래) 시작 자리로 되돌립니다
-            if (hasStart && player != null && !player.IsHugging && player.transform.position.y < startPosition.y - 3f)
+            // 집 밖으로 떨어지면 시작 자리로 되돌립니다: 시작 층보다 3m 아래이면서 머리 위에 천장이 없는(실외) 상태가 1초 이상일 때.
+            // 계단으로 아래층에 내려간 경우는 천장이 있으므로 그대로 둡니다.
+            if (hasStart && player != null && !player.IsHugging && player.transform.position.y < startPosition.y - 3f && !HasCeiling(player.transform.position))
             {
-                player.Teleport(startPosition, startYaw);
-                Debug.Log("[GameManager] 집 밖으로 떨어져 시작 위치로 되돌림");
+                outsideTime += Time.deltaTime;
+                if (outsideTime > 1f)
+                {
+                    outsideTime = 0f;
+                    player.Teleport(startPosition, startYaw);
+                    Debug.Log("[GameManager] 집 밖으로 떨어져 시작 위치로 되돌림");
+                }
             }
+            else outsideTime = 0f;
 
             // WebGL에서는 ESC를 누르면 브라우저가 마우스 잠금을 먼저 풀어버리므로, 잠금이 풀린 것을 보고 일시정지합니다.
             if (UIKit.IsWebGL)
