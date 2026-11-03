@@ -269,7 +269,7 @@ public static class CatSpawner
     /// <summary>
     /// 시작 위치에서 벽을 통과하지 않고 걸어갈 수 있는 바닥 칸들을 BFS로 찾습니다.
     /// </summary>
-    static List<Vector3> FloodWalkable(Vector3 feet, int mask)
+    public static List<Vector3> FloodWalkable(Vector3 feet, int mask)
     {
         List<Vector3> cells = new List<Vector3>();
         Dictionary<Vector2Int, Vector3> visited = new Dictionary<Vector2Int, Vector3>();

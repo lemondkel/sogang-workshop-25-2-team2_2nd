@@ -20,6 +20,8 @@ public static class WebGLBuild
             "Assets/Scenes/IntroScene.unity",
             "Assets/Scenes/MainScene.unity",
             "Assets/Scenes/OutroScene.unity",
+            "Assets/Brick Project Studio/Apartment Kit/Scenes/Scene_01.unity", // 3단계 집
+            "Assets/Brick Project Studio/Apartment Kit/Scenes/Scene_02.unity", // 4·5단계 집
         };
 
         // 서버가 Content-Encoding 헤더를 못 붙여도 열리도록: gzip 압축 + 브라우저 쪽 압축 해제(decompression fallback)

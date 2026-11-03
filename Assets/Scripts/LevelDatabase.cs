@@ -54,6 +54,12 @@ public class CatLevel
     [Tooltip("고양이가 숨을 자리 사이를 돌아다니고, 가까이 가면 도망칠지. 직접 지정한 위치(fixedSpawnPositions)의 고양이는 움직이지 않습니다.")]
     public bool catsWander = true;
 
+    [Tooltip("이 레벨에서 쓸 집(맵) 씬 이름. 비우면 MainScene의 기본 집(Apart). 예: Scene_01, Scene_02 (Apartment Kit 데모 씬, 빌드 설정에 포함돼 있어야 함)")]
+    public string mapScene = "";
+
+    [Tooltip("시작(리스폰) 위치를 걸어갈 수 있는 바닥의 트인 자리 중에서 매 판 무작위로 고를지. 끄면 씬에 놓인 캐릭터 위치(기본 집) 또는 맵에서 찾은 한 곳에서 시작합니다.")]
+    public bool randomStart = true;
+
     [Tooltip("비워두면 집 안에서 숨을 곳을 자동으로 찾습니다. 직접 지정하면 이 위치들을 먼저 사용합니다.")]
     public Vector3[] fixedSpawnPositions = new Vector3[0];
 }

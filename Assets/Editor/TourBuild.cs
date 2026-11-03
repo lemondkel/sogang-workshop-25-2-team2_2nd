@@ -18,6 +18,8 @@ public static class TourBuild
             "Assets/Scenes/IntroScene.unity",
             "Assets/Scenes/MainScene.unity",
             "Assets/Scenes/OutroScene.unity",
+            "Assets/Brick Project Studio/Apartment Kit/Scenes/Scene_01.unity", // 3단계 집
+            "Assets/Brick Project Studio/Apartment Kit/Scenes/Scene_02.unity", // 4·5단계 집
         };
 
         BuildPlayerOptions options = new BuildPlayerOptions

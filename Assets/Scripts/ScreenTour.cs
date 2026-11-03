@@ -133,6 +133,8 @@ public class ScreenTour : MonoBehaviour
     {
         SceneManager.LoadScene(scene);
         yield return null;
+        // 게임 씬은 맵 불러오기·고양이 배치가 끝날 때까지 기다립니다
+        while (GameManager.Instance != null && !GameManager.Instance.Ready) yield return null;
         yield return null;
         yield return Wait(0.8f);
     }

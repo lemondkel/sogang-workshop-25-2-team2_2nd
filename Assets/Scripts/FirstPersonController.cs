@@ -220,6 +220,23 @@ public class FirstPersonController : MonoBehaviour
         ApplySettings();
     }
 
+    /// <summary>시작 위치로 옮기고 시점을 맞춥니다 (레벨 시작 시 리스폰 위치용).</summary>
+    public void Teleport(Vector3 position, float yawDegrees)
+    {
+        bool wasEnabled = characterController.enabled;
+        characterController.enabled = false;
+        transform.position = position;
+        transform.rotation = Quaternion.Euler(0f, yawDegrees, 0f);
+        yaw = targetYaw = yawDegrees;
+        pitch = targetPitch = 12f;
+        planarVelocity = Vector3.zero;
+        verticalVelocity = 0f;
+        standoffPushSmoothed = Vector3.zero;
+        characterController.enabled = wasEnabled;
+        Physics.SyncTransforms();
+        if (cam != null && viewMode == ViewMode.ThirdPerson) currentCameraDistance = cameraDistance;
+    }
+
     // 설정 화면에서 바꾼 마우스 감도/반전을 적용합니다.
     public void ApplySettings()
     {

@@ -91,7 +91,7 @@ public class GameManager : MonoBehaviour
         GameSession.ApplySettings();
     }
 
-    void Start()
+    IEnumerator Start()
     {
         LevelDatabase db = LevelDatabase.Load();
         LevelIndex = Mathf.Clamp(GameSession.SelectedLevel, 0, Mathf.Max(0, db.LevelCount - 1));
@@ -101,12 +101,17 @@ public class GameManager : MonoBehaviour
         player = FindObjectOfType<FirstPersonController>();
         if (player != null) player.ApplySettings();
 
+        // 레벨에 다른 집(맵)이 지정돼 있으면 불러오고 기본 집을 치웁니다
+        yield return MapLoader.Load(Level.mapScene);
+
         // 콜라이더가 없는 가구에 콜라이더를 붙인 뒤에 고양이를 숨겨야 가구 속에 숨지 않습니다.
         int addedColliders = FurnitureColliders.EnsureColliders();
         if (addedColliders > 0) Debug.Log("[FurnitureColliders] 콜라이더 없는 가구 " + addedColliders + "개에 BoxCollider 추가");
 
         // 문/서랍은 E 키(시선 상호작용)로 여닫습니다. 스크립트 자체의 마우스 오버 입력은 끕니다.
         DoorInteraction.DisableBuiltInInput();
+
+        PlacePlayer();
 
         SpawnLevelCats(db);
 
@@ -118,7 +123,11 @@ public class GameManager : MonoBehaviour
         // 미션 안내 화면에서 '시작!'을 누르면 플레이 시작 (WebGL에서 마우스 잠금에 클릭이 필요하기도 합니다)
         SetCursorFree(true);
         hud.ShowBriefing();
+        Ready = true;
     }
+
+    /// <summary>맵 불러오기·고양이 배치·HUD 생성이 끝나 조작할 수 있는 상태인지 (Start가 코루틴이라 몇 프레임 걸립니다).</summary>
+    public bool Ready { get; private set; }
 
     void OnDestroy()
     {
@@ -160,6 +169,29 @@ public class GameManager : MonoBehaviour
     }
 
     // ===== 레벨 준비 =====
+
+    /// <summary>
+    /// 시작(리스폰) 위치를 정합니다. 다른 집이면 그 집에서 걸어갈 수 있는 바닥을 찾고, 랜덤 시작이 켜져 있으면 트인 자리 중 하나를 무작위로 고릅니다.
+    /// 집이 바뀌었으면 MainScene의 소품·단서도 새 집으로 옮깁니다.
+    /// </summary>
+    void PlacePlayer()
+    {
+        if (player == null) return;
+        bool mapChanged = MapLoader.MapLoaded;
+        if (!mapChanged && !Level.randomStart) return;
+
+        CharacterController cc = player.GetComponent<CharacterController>();
+        if (cc != null) cc.enabled = false;
+        Vector3 seed = player.transform.position;
+        List<Vector3> walkable;
+        Vector3 start = MapLoader.PickStart(seed, !mapChanged, out walkable);
+        if (!Level.randomStart && !mapChanged) start = seed;
+        float yaw = Random.Range(0f, 360f);
+        player.Teleport(start, yaw);
+        if (mapChanged) MapLoader.RelocateDecor(walkable, start);
+        if (cc != null) cc.enabled = true;
+        Debug.Log("[GameManager] 시작 위치 " + start + (mapChanged ? " (맵 " + Level.mapScene + ")" : ""));
+    }
 
     void SpawnLevelCats(LevelDatabase db)
     {
