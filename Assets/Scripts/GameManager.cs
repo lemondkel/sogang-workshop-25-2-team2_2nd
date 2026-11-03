@@ -103,6 +103,7 @@ public class GameManager : MonoBehaviour
 
         // 레벨에 다른 집(맵)이 지정돼 있으면 불러오고 기본 집을 치웁니다
         yield return MapLoader.Load(Level.mapScene);
+        CatSpawner.IndoorOnly = MapLoader.MapLoaded; // 불러온 집은 발코니·지붕 위를 '갈 수 있는 곳'으로 치지 않습니다
 
         // 콜라이더가 없는 가구에 콜라이더를 붙인 뒤에 고양이를 숨겨야 가구 속에 숨지 않습니다.
         int addedColliders = FurnitureColliders.EnsureColliders();
@@ -129,6 +130,11 @@ public class GameManager : MonoBehaviour
     /// <summary>맵 불러오기·고양이 배치·HUD 생성이 끝나 조작할 수 있는 상태인지 (Start가 코루틴이라 몇 프레임 걸립니다).</summary>
     public bool Ready { get; private set; }
 
+    // 떨어졌을 때 되돌릴 시작 위치 (불러온 집은 발코니·난간 틈으로 밖에 떨어질 수 있습니다)
+    Vector3 startPosition;
+    float startYaw;
+    bool hasStart;
+
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
@@ -148,6 +154,13 @@ public class GameManager : MonoBehaviour
 
             if (Input.GetKeyDown(KeyCode.H)) UseHint();
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)) Pause();
+
+            // 집 밖으로 떨어지면(시작 층보다 3m 아래) 시작 자리로 되돌립니다
+            if (hasStart && player != null && !player.IsHugging && player.transform.position.y < startPosition.y - 3f)
+            {
+                player.Teleport(startPosition, startYaw);
+                Debug.Log("[GameManager] 집 밖으로 떨어져 시작 위치로 되돌림");
+            }
 
             // WebGL에서는 ESC를 누르면 브라우저가 마우스 잠금을 먼저 풀어버리므로, 잠금이 풀린 것을 보고 일시정지합니다.
             if (UIKit.IsWebGL)
@@ -188,6 +201,7 @@ public class GameManager : MonoBehaviour
         if (!Level.randomStart && !mapChanged) start = seed;
         float yaw = Random.Range(0f, 360f);
         player.Teleport(start, yaw);
+        startPosition = start; startYaw = yaw; hasStart = true;
         if (mapChanged)
         {
             MapLoader.RelocateDecor(walkable, start);

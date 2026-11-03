@@ -269,6 +269,9 @@ public static class CatSpawner
     /// <summary>
     /// 시작 위치에서 벽을 통과하지 않고 걸어갈 수 있는 바닥 칸들을 BFS로 찾습니다.
     /// </summary>
+    /// <summary>true면 천장이 있는 실내 칸만 걸어갈 수 있는 곳으로 칩니다 (여러 층 집의 발코니·지붕 위로 번지지 않게).</summary>
+    public static bool IndoorOnly;
+
     public static List<Vector3> FloodWalkable(Vector3 feet, int mask)
     {
         List<Vector3> cells = new List<Vector3>();
@@ -304,6 +307,7 @@ public static class CatSpawner
                 // 플레이어 캡슐(반지름 0.38)에 맞춥니다. 좁게 잡으면 세탁기와 벽 사이 같은 틈이 '갈 수 있는 곳'이 되어 거기 숨은 고양이를 잡을 수 없습니다.
                 Vector3 floor = hit.point;
                 if (BlockedCapsule(floor + Vector3.up * 0.6f, floor + Vector3.up * 1.3f, 0.36f, mask)) continue;
+                if (IndoorOnly && !Physics.Raycast(floor + Vector3.up * 0.3f, Vector3.up, 8f, mask, QueryTriggerInteraction.Ignore)) continue;
 
                 // 칸 사이에 벽이 있는지 (얇은 벽 통과 방지). 무릎 아래(0.3m)도 봐서 욕조 턱·침대처럼 낮은 가구를 넘어가지 않게 합니다 (캐릭터는 0.15m 턱까지만 오릅니다).
                 Vector3 a = curPos + Vector3.up * 0.6f;
